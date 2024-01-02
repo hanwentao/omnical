@@ -2,7 +2,9 @@
 name = "omnical"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "displays a calendar of different kinds"
+license = "MIT"
+repository = "https://github.com/hanwentao/omnical/"
+readme = "README.md"
 
 [dependencies]
