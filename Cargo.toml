@@ -8,3 +8,4 @@ repository = "https://github.com/hanwentao/omnical/"
 readme = "README.md"
 
 [dependencies]
+chrono = "0.4.33"
