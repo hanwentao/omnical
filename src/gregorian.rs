@@ -1,33 +1,54 @@
-use strum::{Display, EnumCount, EnumString, FromRepr, VariantArray};
+use strum::{AsRefStr, Display, EnumCount, EnumString, FromRepr, VariantArray};
 
+use crate::calendar;
 use crate::date::*;
 
 #[cfg(test)]
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg(test)]
+use crate::calendar::Day as _;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Year {
     year: i32,
 }
 
 impl Year {
-    pub fn new(year: i32) -> Self {
+    fn new(year: i32) -> Self {
         Self { year }
     }
 
-    pub fn ordinal(&self) -> i32 {
+    pub fn ord(&self) -> i32 {
         self.year
+    }
+
+    // FIXME: Year 0 issue
+    pub fn from_ord(ord: i32) -> Self {
+        Self::new(ord)
+    }
+
+    pub fn from_y(y: i32) -> Self {
+        Self::from_ord(y)
     }
 
     pub fn is_leap(&self) -> bool {
         self.year % 400 == 0 || (self.year % 4 == 0 && self.year % 100 != 0)
     }
 
-    pub fn num_months(&self) -> u8 {
+    pub fn succ(&self) -> Self {
+        Self::new(self.year + 1)
+    }
+
+    pub fn pred(&self) -> Self {
+        Self::new(self.year - 1)
+    }
+
+    pub fn num_months(&self) -> usize {
         12
     }
 
-    pub fn num_days(&self) -> u16 {
+    pub fn num_days(&self) -> usize {
         if self.is_leap() {
             366
         } else {
@@ -35,10 +56,31 @@ impl Year {
         }
     }
 
-    pub fn months(&self) -> Vec<Month> {
+    pub fn month_by_name(&self, month_name: MonthName) -> Month {
+        Month::new(*self, month_name)
+    }
+
+    pub fn month(&self, month_ord: u8) -> Option<Month> {
+        MonthName::from_ord(month_ord).map(|mn| self.month_by_name(mn))
+    }
+
+    pub fn first_month(&self) -> Month {
+        self.month_by_name(MonthName::first())
+    }
+
+    pub fn last_month(&self) -> Month {
+        self.month_by_name(MonthName::last())
+    }
+}
+
+impl calendar::Year for Year {
+    type Month = Month;
+    type Day = Day;
+
+    fn months(&self) -> Vec<Month> {
         MonthName::VARIANTS
             .iter()
-            .map(|m| Month::new(self.year, *m))
+            .map(|mn| self.month_by_name(*mn))
             .collect()
     }
 }
@@ -46,7 +88,7 @@ impl Year {
 #[test]
 fn test_year() {
     let year = Year::new(1985);
-    assert_eq!(year.ordinal(), 1985);
+    assert_eq!(year.ord(), 1985);
     assert!(!year.is_leap());
     assert_eq!(year.num_months(), 12);
     assert_eq!(year.num_days(), 365);
@@ -54,12 +96,24 @@ fn test_year() {
     assert!(Year::new(2024).is_leap());
     assert!(Year::new(2000).is_leap());
     assert!(!Year::new(1900).is_leap());
+
+    assert_eq!(year.succ(), Year::new(1986));
+    assert_eq!(year.pred(), Year::new(1984));
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, EnumCount, VariantArray, Display, EnumString, FromRepr,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    EnumCount,
+    VariantArray,
+    Display,
+    AsRefStr,
+    EnumString,
+    FromRepr,
 )]
-#[repr(u8)]
 pub enum MonthName {
     January,
     February,
@@ -75,21 +129,33 @@ pub enum MonthName {
     December,
 }
 
+pub use MonthName::*;
+
 impl MonthName {
-    pub fn ordinal(&self) -> u8 {
+    pub fn ord(&self) -> u8 {
         *self as u8 + 1
     }
 
-    pub fn from_ordinal(ord: u8) -> Option<Self> {
-        if ord > 0 {
-            Self::from_repr(ord - 1)
-        } else {
-            None
-        }
+    pub fn from_ord(ord: u8) -> Option<Self> {
+        Self::from_repr((ord as isize - 1) as usize)
+    }
+
+    pub fn first() -> Self {
+        January
+    }
+
+    pub fn last() -> Self {
+        December
+    }
+
+    pub fn succ(&self) -> Option<Self> {
+        Self::from_repr((*self as i8 + 1) as usize)
+    }
+
+    pub fn pred(&self) -> Option<Self> {
+        Self::from_repr((*self as i8 - 1) as usize)
     }
 }
-
-pub use MonthName::*;
 
 #[test]
 fn test_month_name() {
@@ -104,17 +170,22 @@ fn test_month_name() {
 
     let jan = MonthName::from_str("January").unwrap();
     assert_eq!(jan as u8, 0);
-    assert_eq!(jan.ordinal(), 1);
+    assert_eq!(jan.ord(), 1);
     assert_eq!(jan.to_string(), "January");
 
     let dec = MonthName::from_repr(11).unwrap();
     assert_eq!(dec as u8, 11);
-    assert_eq!(dec.ordinal(), 12);
+    assert_eq!(dec.ord(), 12);
     assert_eq!(dec.to_string(), "December");
 
     assert!(MonthName::from_str("Invalid").is_err());
     assert!(MonthName::from_repr(12).is_none());
-    assert_eq!(MonthName::from_ordinal(9), Some(September));
+    assert_eq!(MonthName::from_ord(9), Some(September));
+
+    assert_eq!(January.succ(), Some(February));
+    assert_eq!(January.pred(), None);
+    assert_eq!(December.pred(), Some(November));
+    assert_eq!(December.succ(), None);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,34 +195,54 @@ pub struct Month {
 }
 
 impl Month {
-    pub fn new(year: i32, month: MonthName) -> Self {
-        Self {
-            year: Year::new(year),
-            month,
-        }
+    fn new(year: Year, month: MonthName) -> Self {
+        Self { year, month }
+    }
+
+    pub fn from_yn(year: i32, month_name: MonthName) -> Self {
+        Year::new(year).month_by_name(month_name)
     }
 
     pub fn from_ym(year: i32, month: u8) -> Option<Self> {
-        MonthName::from_ordinal(month).map(|m| Self::new(year, m))
+        MonthName::from_ord(month).map(|mn| Self::from_yn(year, mn))
     }
 
     pub fn year(&self) -> Year {
         self.year
     }
 
-    pub fn month(&self) -> MonthName {
+    pub fn name(&self) -> MonthName {
         self.month
     }
 
-    pub fn ordinal(&self) -> u8 {
-        self.month.ordinal()
+    pub fn ord(&self) -> u8 {
+        self.month.ord()
     }
 
     pub fn is_leap(&self) -> bool {
-        self.month == February && self.year.is_leap()
+        match self.month {
+            February => self.year.is_leap(),
+            _ => false,
+        }
     }
 
-    pub fn num_days(&self) -> u8 {
+    pub fn succ(&self) -> Self {
+        if let Some(next_month) = self.month.succ() {
+            self.year.month_by_name(next_month)
+        } else {
+            self.year.succ().first_month()
+        }
+    }
+
+    pub fn pred(&self) -> Self {
+        if let Some(prev_month) = self.month.pred() {
+            self.year.month_by_name(prev_month)
+        } else {
+            self.year.pred().last_month()
+        }
+    }
+
+    pub fn num_days(&self) -> usize {
         match self.month {
             January | March | May | July | August | October | December => 31,
             April | June | September | November => 30,
@@ -165,31 +256,65 @@ impl Month {
         }
     }
 
-    pub fn days(&self) -> Vec<Day> {
-        (1..=self.num_days())
-            .map(|d| Day::from_ymd(self.year.ordinal(), self.month.ordinal(), d).unwrap())
+    pub fn day(&self, day_ord: u8) -> Option<Day> {
+        if day_ord < 1 || day_ord > self.num_days() as u8 {
+            return None;
+        }
+        Some(Day::new(*self, (day_ord as i8 - 1) as u8))
+    }
+
+    pub fn first_day(&self) -> Day {
+        Day::new(*self, 0)
+    }
+
+    pub fn last_day(&self) -> Day {
+        Day::new(*self, self.num_days() as u8 - 1)
+    }
+}
+
+impl calendar::Month for Month {
+    type Year = Year;
+    type Day = Day;
+
+    fn days(&self) -> Vec<Day> {
+        (0..self.num_days() as u8)
+            .map(|d| Day::new(*self, d))
             .collect()
     }
 }
 
 #[test]
 fn test_month() {
-    let month = Month::new(1985, September);
-    assert_eq!(month.year().ordinal(), 1985);
-    assert_eq!(month.ordinal(), 9);
+    let month = Month::from_yn(1985, September);
+    assert_eq!(month.year().ord(), 1985);
+    assert_eq!(month.ord(), 9);
     assert!(!month.is_leap());
     assert_eq!(month.num_days(), 30);
 
-    assert!(!Month::new(1985, February).is_leap());
-    assert!(Month::new(2024, February).is_leap());
-    assert!(Month::new(2000, February).is_leap());
-    assert!(!Month::new(1900, February).is_leap());
+    assert!(!Month::from_yn(1985, February).is_leap());
+    assert!(Month::from_yn(2024, February).is_leap());
+    assert!(Month::from_yn(2000, February).is_leap());
+    assert!(!Month::from_yn(1900, February).is_leap());
 
-    assert_eq!(Month::new(1986, January).num_days(), 31);
+    assert_eq!(Month::from_yn(1986, January).num_days(), 31);
 
-    assert!(Month::from_ym(2024, 0).is_none());
-    assert!(Month::from_ym(2024, 13).is_none());
-    assert_eq!(Month::from_ym(2024, 2), Some(Month::new(2024, February)));
+    assert_eq!(Month::from_ym(2024, 0), None);
+    assert_eq!(Month::from_ym(2024, 13), None);
+    assert_eq!(
+        Month::from_ym(2024, 2),
+        Some(Month::from_yn(2024, February))
+    );
+
+    assert_eq!(month.succ(), Month::from_yn(1985, October));
+    assert_eq!(month.pred(), Month::from_yn(1985, August));
+    assert_eq!(
+        Month::from_yn(2024, January).pred(),
+        Month::from_yn(2023, December)
+    );
+    assert_eq!(
+        Month::from_yn(2023, December).succ(),
+        Month::from_yn(2024, January)
+    );
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -199,25 +324,19 @@ pub struct Day {
 }
 
 impl Day {
+    fn new(month: Month, day: u8) -> Self {
+        Self { month, day }
+    }
+
+    pub fn from_ynd(year: i32, month_name: MonthName, day: u8) -> Option<Self> {
+        Month::from_yn(year, month_name).day(day)
+    }
+
     pub fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
-        Month::from_ym(year, month).and_then(|ym| {
-            if day >= 1 && day <= ym.num_days() {
-                Some(Self {
-                    month: ym,
-                    day: day - 1,
-                })
-            } else {
-                None
-            }
-        })
+        Month::from_ym(year, month).and_then(|m| m.day(day))
     }
 
-    pub fn from_date(date: Date) -> Self {
-        let (y, m, d) = astro::time::date_frm_julian_day(date.julian_date()).unwrap();
-        Self::from_ymd(y as i32, m, d as u8).unwrap()
-    }
-
-    pub fn ordinal(&self) -> u8 {
+    pub fn ord(&self) -> u8 {
         self.day + 1
     }
 
@@ -229,24 +348,54 @@ impl Day {
         self.month
     }
 
-    pub fn as_date(&self) -> Date {
+    pub fn succ(&self) -> Self {
+        if self.day == self.month.num_days() as u8 - 1 {
+            self.month.succ().first_day()
+        } else {
+            Self::new(self.month, self.day + 1)
+        }
+    }
+
+    pub fn pred(&self) -> Self {
+        if self.day == 0 {
+            self.month.pred().last_day()
+        } else {
+            Self::new(self.month, self.day - 1)
+        }
+    }
+
+    pub fn from_date_with_tz(date: Date, tz: f64) -> Self {
+        let (y, m, d) = astro::time::date_frm_julian_day(date.midnight_jd(tz)).unwrap();
+        Self::from_ymd(y as i32, m, d as u8).unwrap()
+    }
+
+    pub fn from_date(date: Date) -> Self {
+        Self::from_date_with_tz(date, 0.0)
+    }
+}
+
+impl calendar::Day for Day {
+    type Year = Year;
+    type Month = Month;
+
+    fn as_date(&self) -> Date {
         let day_of_month = astro::time::DayOfMonth {
-            day: self.ordinal(),
+            day: self.ord(),
             hr: 0,
             min: 0,
             sec: 0.0,
             time_zone: 0.0,
         };
         let astro_date = astro::time::Date {
-            year: self.year().ordinal() as i16,
-            month: self.month.ordinal(),
+            year: self.year().ord() as i16,
+            month: self.month.ord(),
             decimal_day: astro::time::decimal_day(&day_of_month),
             cal_type: astro::time::CalType::Gregorian,
         };
         Date::from_jd(astro::time::julian_day(&astro_date))
     }
 
-    pub fn weekday(&self) -> Weekday {
+    fn weekday(&self) -> Weekday {
         let date = self.as_date();
         date.weekday()
     }
@@ -254,12 +403,54 @@ impl Day {
 
 #[test]
 fn test_day() {
-    let day = Day::from_ymd(1985, 9, 15).unwrap();
-    assert_eq!(day.weekday(), Sunday);
+    assert_eq!(Day::from_ymd(-4713, 11, 24).unwrap().as_date().jdn(), 0);
+    assert_eq!(Day::from_ymd(2000, 1, 1).unwrap().as_date().jdn(), 2451545);
 
     assert_eq!(Day::from_ymd(1582, 10, 15).unwrap().weekday(), Friday);
+    assert_eq!(Day::from_ymd(1985, 9, 15).unwrap().weekday(), Sunday);
     assert_eq!(Day::from_ymd(2024, 2, 11).unwrap().weekday(), Sunday);
 
-    assert!(Day::from_ymd(2024, 2, 29).is_some());
-    assert!(Day::from_ymd(2022, 2, 29).is_none());
+    assert_ne!(Day::from_ymd(2024, 2, 29), None);
+    assert_eq!(Day::from_ymd(2022, 2, 29), None);
+
+    let last_day_of_2023 = Day::from_ymd(2023, 12, 31).unwrap();
+    let first_day_of_2024 = Day::from_ymd(2024, 1, 1).unwrap();
+    assert_eq!(last_day_of_2023.succ(), first_day_of_2024);
+    assert_eq!(first_day_of_2024.pred(), last_day_of_2023);
+}
+
+impl std::fmt::Display for Year {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, "{}年", self.ord())
+        } else if f.sign_minus() {
+            write!(f, "{}", self.ord())
+        } else {
+            write!(f, "{:04}", self.ord())
+        }
+    }
+}
+
+impl std::fmt::Display for Month {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, "{:#}{}月", self.year, self.ord())
+        } else if f.sign_minus() {
+            write!(f, "{} {:-}", self.month.as_ref(), self.year)
+        } else {
+            write!(f, "{:04}-{:02}", self.year, self.ord())
+        }
+    }
+}
+
+impl std::fmt::Display for Day {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, "{:#}{}日", self.month(), self.ord())
+        } else if f.sign_minus() {
+            write!(f, "{} {:-}", self.ord(), self.month)
+        } else {
+            write!(f, "{}-{:02}", self.month(), self.ord())
+        }
+    }
 }

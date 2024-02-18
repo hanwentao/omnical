@@ -1,14 +1,16 @@
 [package]
 name = "omnical"
-version = "0.9.0"
+version = "0.9.9"
 edition = "2021"
-description = "displays a calendar of different kinds"
+description = "Prints calendars, converts dates, and etc."
 license = "MIT"
 repository = "https://github.com/hanwentao/omnical/"
 readme = "README.md"
+default-run = "omnical"
 
 [dependencies]
 astro = "2.0.0"
-chrono = "0.4.33"
+clap = { version = "4.5.1", features = ["derive"] }
+derivative = "2.2.0"
 strum = { version = "0.26.1", features = ["derive"] }
 strum_macros = "0.26.1"
