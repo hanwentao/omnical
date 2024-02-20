@@ -1,13 +1,11 @@
 use strum::{AsRefStr, Display, EnumCount, EnumString, FromRepr, VariantArray};
 
 use crate::calendar;
+use crate::calendar::{Day as _, Month as _, Year as _};
 use crate::date::*;
 
 #[cfg(test)]
 use std::str::FromStr;
-
-#[cfg(test)]
-use crate::calendar::Day as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Year {
@@ -19,11 +17,6 @@ impl Year {
         Self { year }
     }
 
-    pub fn ord(&self) -> i32 {
-        self.year
-    }
-
-    // FIXME: Year 0 issue
     pub fn from_ord(ord: i32) -> Self {
         Self::new(ord)
     }
@@ -32,44 +25,8 @@ impl Year {
         Self::from_ord(y)
     }
 
-    pub fn is_leap(&self) -> bool {
-        self.year % 400 == 0 || (self.year % 4 == 0 && self.year % 100 != 0)
-    }
-
-    pub fn succ(&self) -> Self {
-        Self::new(self.year + 1)
-    }
-
-    pub fn pred(&self) -> Self {
-        Self::new(self.year - 1)
-    }
-
-    pub fn num_months(&self) -> usize {
-        12
-    }
-
-    pub fn num_days(&self) -> usize {
-        if self.is_leap() {
-            366
-        } else {
-            365
-        }
-    }
-
     pub fn month_by_name(&self, month_name: MonthName) -> Month {
         Month::new(*self, month_name)
-    }
-
-    pub fn month(&self, month_ord: u8) -> Option<Month> {
-        MonthName::from_ord(month_ord).map(|mn| self.month_by_name(mn))
-    }
-
-    pub fn first_month(&self) -> Month {
-        self.month_by_name(MonthName::first())
-    }
-
-    pub fn last_month(&self) -> Month {
-        self.month_by_name(MonthName::last())
     }
 }
 
@@ -77,11 +34,55 @@ impl calendar::Year for Year {
     type Month = Month;
     type Day = Day;
 
+    fn ord(&self) -> i32 {
+        self.year
+    }
+
+    fn succ(&self) -> Self {
+        Self::new(self.year + 1)
+    }
+
+    fn pred(&self) -> Self {
+        Self::new(self.year - 1)
+    }
+
+    fn num_months(&self) -> usize {
+        12
+    }
+
+    fn month(&self, month_ord: u8) -> Option<Month> {
+        MonthName::from_ord(month_ord).map(|mn| self.month_by_name(mn))
+    }
+
+    fn first_month(&self) -> Month {
+        self.month_by_name(MonthName::first())
+    }
+
+    fn last_month(&self) -> Month {
+        self.month_by_name(MonthName::last())
+    }
+
     fn months(&self) -> Vec<Month> {
         MonthName::VARIANTS
             .iter()
             .map(|mn| self.month_by_name(*mn))
             .collect()
+    }
+
+    fn num_days(&self) -> usize {
+        if self.is_leap() {
+            366
+        } else {
+            365
+        }
+    }
+
+    fn day(&self, _ord: u16) -> Option<Day> {
+        todo!()
+    }
+
+    fn is_leap(&self) -> bool {
+        self.year % 400 == 0 || (self.year % 4 == 0 && self.year % 100 != 0)
     }
 }
 
@@ -207,26 +208,20 @@ impl Month {
         MonthName::from_ord(month).map(|mn| Self::from_yn(year, mn))
     }
 
-    pub fn year(&self) -> Year {
-        self.year
-    }
-
     pub fn name(&self) -> MonthName {
         self.month
     }
+}
 
-    pub fn ord(&self) -> u8 {
+impl calendar::Month for Month {
+    type Year = Year;
+    type Day = Day;
+
+    fn ord(&self) -> u8 {
         self.month.ord()
     }
 
-    pub fn is_leap(&self) -> bool {
-        match self.month {
-            February => self.year.is_leap(),
-            _ => false,
-        }
-    }
-
-    pub fn succ(&self) -> Self {
+    fn succ(&self) -> Self {
         if let Some(next_month) = self.month.succ() {
             self.year.month_by_name(next_month)
         } else {
@@ -234,7 +229,7 @@ impl Month {
         }
     }
 
-    pub fn pred(&self) -> Self {
+    fn pred(&self) -> Self {
         if let Some(prev_month) = self.month.pred() {
             self.year.month_by_name(prev_month)
         } else {
@@ -242,7 +237,11 @@ impl Month {
         }
     }
 
-    pub fn num_days(&self) -> usize {
+    fn year(&self) -> Year {
+        self.year
+    }
+
+    fn num_days(&self) -> usize {
         match self.month {
             January | March | May | July | August | October | December => 31,
             April | June | September | November => 30,
@@ -256,30 +255,18 @@ impl Month {
         }
     }
 
-    pub fn day(&self, day_ord: u8) -> Option<Day> {
+    fn day(&self, day_ord: u8) -> Option<Day> {
         if day_ord < 1 || day_ord > self.num_days() as u8 {
             return None;
         }
         Some(Day::new(*self, (day_ord as i8 - 1) as u8))
     }
 
-    pub fn first_day(&self) -> Day {
-        Day::new(*self, 0)
-    }
-
-    pub fn last_day(&self) -> Day {
-        Day::new(*self, self.num_days() as u8 - 1)
-    }
-}
-
-impl calendar::Month for Month {
-    type Year = Year;
-    type Day = Day;
-
-    fn days(&self) -> Vec<Day> {
-        (0..self.num_days() as u8)
-            .map(|d| Day::new(*self, d))
-            .collect()
+    fn is_leap(&self) -> bool {
+        match self.month {
+            February => self.year.is_leap(),
+            _ => false,
+        }
     }
 }
 
@@ -336,34 +323,6 @@ impl Day {
         Month::from_ym(year, month).and_then(|m| m.day(day))
     }
 
-    pub fn ord(&self) -> u8 {
-        self.day + 1
-    }
-
-    pub fn year(&self) -> Year {
-        self.month.year
-    }
-
-    pub fn month(&self) -> Month {
-        self.month
-    }
-
-    pub fn succ(&self) -> Self {
-        if self.day == self.month.num_days() as u8 - 1 {
-            self.month.succ().first_day()
-        } else {
-            Self::new(self.month, self.day + 1)
-        }
-    }
-
-    pub fn pred(&self) -> Self {
-        if self.day == 0 {
-            self.month.pred().last_day()
-        } else {
-            Self::new(self.month, self.day - 1)
-        }
-    }
-
     pub fn from_date_with_tz(date: Date, tz: f64) -> Self {
         let (y, m, d) = astro::time::date_frm_julian_day(date.midnight_jd(tz)).unwrap();
         Self::from_ymd(y as i32, m, d as u8).unwrap()
@@ -377,6 +336,34 @@ impl Day {
 impl calendar::Day for Day {
     type Year = Year;
     type Month = Month;
+
+    fn ord(&self) -> u8 {
+        self.day + 1
+    }
+
+    fn succ(&self) -> Self {
+        if self.day == self.month.num_days() as u8 - 1 {
+            self.month.succ().first_day()
+        } else {
+            Self::new(self.month, self.day + 1)
+        }
+    }
+
+    fn pred(&self) -> Self {
+        if self.day == 0 {
+            self.month.pred().last_day()
+        } else {
+            Self::new(self.month, self.day - 1)
+        }
+    }
+
+    fn year(&self) -> Year {
+        self.month.year
+    }
+
+    fn month(&self) -> Month {
+        self.month
+    }
 
     fn as_date(&self) -> Date {
         let day_of_month = astro::time::DayOfMonth {
@@ -393,11 +380,6 @@ impl calendar::Day for Day {
             cal_type: astro::time::CalType::Gregorian,
         };
         Date::from_jd(astro::time::julian_day(&astro_date))
-    }
-
-    fn weekday(&self) -> Weekday {
-        let date = self.as_date();
-        date.weekday()
     }
 }
 
