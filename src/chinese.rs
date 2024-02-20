@@ -76,7 +76,7 @@ fn calc_chinese_year_period_data(year: i32) -> (Date, Vec<u8>, Option<usize>) {
     let is_leap_year = data.len() > 12;
     let mut leap_month = None;
     for (i, (_, has_mt)) in data.iter().enumerate() {
-        if is_leap_year && leap_month == None && !has_mt {
+        if is_leap_year && leap_month.is_none() && !has_mt {
             leap_month = Some(i);
         }
     }
@@ -261,7 +261,7 @@ impl StemBranch {
     }
 
     pub fn from_ord(ord: usize) -> Option<Self> {
-        if ord < 1 || ord > 60 {
+        if !(1..=60).contains(&ord) {
             return None;
         }
         let ord = ord - 1;
@@ -413,28 +413,17 @@ impl Month {
 
     pub fn from_ym(year: i32, month: u8) -> Option<Self> {
         let year = Year::from_ord(year);
-        if month > 0 && month <= year.num_months() as u8 {
-            Some(Self::new(year, month - 1))
-        } else {
-            None
-        }
+        year.month(month)
     }
 
     pub fn from_ylm(year: i32, leap: bool, month: u8) -> Option<Self> {
-        // FIXME: autogen
         let year = Year::from_ord(year);
-        if leap {
-            if month == year.leap_month {
-                Some(Self::new(year, month - 1))
-            } else {
-                None
-            }
+        if leap && month != year.leap_month {
+            None
+        } else if month < year.leap_month || !leap && month == year.leap_month {
+            year.month(month)
         } else {
-            if month > 0 && month <= year.num_months() as u8 {
-                Some(Self::new(year, month - 1))
-            } else {
-                None
-            }
+            year.month(month + 1)
         }
     }
 }
@@ -482,6 +471,29 @@ impl calendar::Month for Month {
     fn is_leap(&self) -> bool {
         self.year.leap_month == self.month
     }
+}
+
+#[test]
+fn test_month() {
+    let year = Year::from_y(2023);
+    assert_eq!(Month::from_ym(2023, 1).unwrap(), Month::new(year, 0));
+    assert_eq!(Month::from_ym(2023, 2).unwrap(), Month::new(year, 1));
+    assert_eq!(Month::from_ym(2023, 3).unwrap(), Month::new(year, 2));
+    assert_eq!(
+        Month::from_ylm(2023, false, 1).unwrap(),
+        Month::new(year, 0)
+    );
+    assert_eq!(
+        Month::from_ylm(2023, false, 2).unwrap(),
+        Month::new(year, 1)
+    );
+    assert_eq!(
+        Month::from_ylm(2023, false, 3).unwrap(),
+        Month::new(year, 3)
+    );
+    assert_eq!(Month::from_ylm(2023, true, 1), None);
+    assert_eq!(Month::from_ylm(2023, true, 2).unwrap(), Month::new(year, 2));
+    assert_eq!(Month::from_ylm(2023, true, 3), None);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
