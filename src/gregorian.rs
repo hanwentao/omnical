@@ -77,8 +77,16 @@ impl calendar::Year for Year {
         }
     }
 
-    fn day(&self, _ord: u16) -> Option<Day> {
-        todo!()
+    fn day(&self, ord: u16) -> Option<Day> {
+        let mut ord = ord as usize;
+        for name in MonthName::VARIANTS.iter() {
+            let month = self.month_by_name(*name);
+            if ord <= month.num_days() {
+                return month.day(ord as u8);
+            }
+            ord -= month.num_days();
+        }
+        None
     }
 
     fn is_leap(&self) -> bool {
@@ -88,18 +96,22 @@ impl calendar::Year for Year {
 
 #[test]
 fn test_year() {
-    let year = Year::new(1985);
+    let year = Year::from_y(1985);
     assert_eq!(year.ord(), 1985);
     assert!(!year.is_leap());
     assert_eq!(year.num_months(), 12);
     assert_eq!(year.num_days(), 365);
 
-    assert!(Year::new(2024).is_leap());
-    assert!(Year::new(2000).is_leap());
-    assert!(!Year::new(1900).is_leap());
+    assert!(Year::from_y(2024).is_leap());
+    assert!(Year::from_y(2000).is_leap());
+    assert!(!Year::from_y(1900).is_leap());
 
-    assert_eq!(year.succ(), Year::new(1986));
-    assert_eq!(year.pred(), Year::new(1984));
+    assert_eq!(year.succ(), Year::from_y(1986));
+    assert_eq!(year.pred(), Year::from_y(1984));
+
+    assert_eq!(year.month(1).unwrap(), year.month_by_name(January));
+    assert_eq!(year.day(1).unwrap(), Day::from_ymd(1985, 1, 1).unwrap());
+    assert_eq!(year.day(365).unwrap(), Day::from_ymd(1985, 12, 31).unwrap());
 }
 
 #[derive(

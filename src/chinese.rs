@@ -254,10 +254,9 @@ impl StemBranch {
     }
 
     pub fn ord(&self) -> usize {
-        // FIXME: might be wrong
-        let m = self.stem as usize;
-        let n = self.branch as usize;
-        m * (Branch::COUNT / 2) + n
+        let m = self.stem as isize;
+        let n = self.branch as isize;
+        (m * 6 - n * 5).rem_euclid(60) as usize + 1
     }
 
     pub fn from_ord(ord: usize) -> Option<Self> {
@@ -281,14 +280,27 @@ fn test_stem_branch() {
         StemBranch::from_ord(1),
         StemBranch::new(Stem::Jia, Branch::Zi)
     );
+    assert_eq!(StemBranch::new(Stem::Jia, Branch::Zi).unwrap().ord(), 1);
     assert_eq!(
         StemBranch::from_ord(2),
         StemBranch::new(Stem::Yi, Branch::Chou)
     );
+    assert_eq!(StemBranch::new(Stem::Yi, Branch::Chou).unwrap().ord(), 2);
+    assert_eq!(
+        StemBranch::from_ord(13),
+        StemBranch::new(Stem::Bing, Branch::Zi)
+    );
+    assert_eq!(StemBranch::new(Stem::Bing, Branch::Zi).unwrap().ord(), 13);
+    assert_eq!(
+        StemBranch::from_ord(41),
+        StemBranch::new(Stem::Jia, Branch::Chen)
+    );
+    assert_eq!(StemBranch::new(Stem::Jia, Branch::Chen).unwrap().ord(), 41);
     assert_eq!(
         StemBranch::from_ord(60),
         StemBranch::new(Stem::Gui, Branch::Hai)
     );
+    assert_eq!(StemBranch::new(Stem::Gui, Branch::Hai).unwrap().ord(), 60);
 }
 
 #[derive(Debug, Clone, Copy, Derivative)]
@@ -333,22 +345,6 @@ impl Year {
     pub fn stem_branch(&self) -> StemBranch {
         StemBranch::from_year(self.year)
     }
-
-    pub fn is_leap(&self) -> bool {
-        self.leap_month < 13
-    }
-
-    pub fn first_month(&self) -> Month {
-        Month::new(*self, 0)
-    }
-
-    pub fn last_month(&self) -> Month {
-        Month::new(*self, self.num_months() as u8 - 1)
-    }
-
-    pub fn num_days(&self) -> usize {
-        self.num_days_of_months.iter().map(|&x| x as usize).sum()
-    }
 }
 
 impl calendar::Year for Year {
@@ -386,11 +382,15 @@ impl calendar::Year for Year {
     fn day(&self, _ord: u16) -> Option<Day> {
         None
     }
+
+    fn is_leap(&self) -> bool {
+        self.leap_month < 13
+    }
 }
 
 #[test]
 fn test_year() {
-    let year = Year::new(2021);
+    let year = Year::from_y(2021);
     assert_eq!(year.ord(), 2021);
     assert_eq!(year.stem(), Stem::Xin);
     assert_eq!(year.branch(), Branch::Chou);
@@ -398,6 +398,8 @@ fn test_year() {
         year.stem_branch(),
         StemBranch::new(Stem::Xin, Branch::Chou).unwrap()
     );
+    assert!(!year.is_leap());
+    assert!(Year::from_y(2023).is_leap());
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
