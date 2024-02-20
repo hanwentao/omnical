@@ -245,12 +245,14 @@ pub struct StemBranch {
 }
 
 impl StemBranch {
-    pub fn new(stem: Stem, branch: Branch) -> Option<Self> {
-        if stem.ord() % 2 == branch.ord() % 2 {
-            Some(Self { stem, branch })
-        } else {
-            None
-        }
+    pub fn new(stem: Stem, branch: Branch) -> Self {
+        Self { stem, branch }
+    }
+
+    pub fn new_with_repr(repr: usize) -> Self {
+        let s = repr % 10;
+        let b = repr % 12;
+        Self::new(Stem::from_repr(s).unwrap(), Branch::from_repr(b).unwrap())
     }
 
     pub fn ord(&self) -> usize {
@@ -263,14 +265,18 @@ impl StemBranch {
         if !(1..=60).contains(&ord) {
             return None;
         }
-        let ord = ord - 1;
-        let stem = Stem::from_repr(ord % Stem::COUNT).unwrap();
-        let branch = Branch::from_repr(ord % Branch::COUNT).unwrap();
-        Some(Self { stem, branch })
+        Some(Self::new_with_repr(ord - 1))
+    }
+
+    pub fn from_stem_branch(stem: Stem, branch: Branch) -> Option<Self> {
+        if stem.ord() % 2 != branch.ord() % 2 {
+            return None;
+        }
+        Some(Self::new(stem, branch))
     }
 
     pub fn from_year(year: i32) -> Self {
-        Self::new(Stem::from_year(year), Branch::from_year(year)).unwrap()
+        Self::new(Stem::from_year(year), Branch::from_year(year))
     }
 }
 
@@ -278,29 +284,54 @@ impl StemBranch {
 fn test_stem_branch() {
     assert_eq!(
         StemBranch::from_ord(1),
-        StemBranch::new(Stem::Jia, Branch::Zi)
+        StemBranch::from_stem_branch(Stem::Jia, Branch::Zi)
     );
-    assert_eq!(StemBranch::new(Stem::Jia, Branch::Zi).unwrap().ord(), 1);
+    assert_eq!(
+        StemBranch::from_stem_branch(Stem::Jia, Branch::Zi)
+            .unwrap()
+            .ord(),
+        1
+    );
     assert_eq!(
         StemBranch::from_ord(2),
-        StemBranch::new(Stem::Yi, Branch::Chou)
+        StemBranch::from_stem_branch(Stem::Yi, Branch::Chou)
     );
-    assert_eq!(StemBranch::new(Stem::Yi, Branch::Chou).unwrap().ord(), 2);
+    assert_eq!(
+        StemBranch::from_stem_branch(Stem::Yi, Branch::Chou)
+            .unwrap()
+            .ord(),
+        2
+    );
     assert_eq!(
         StemBranch::from_ord(13),
-        StemBranch::new(Stem::Bing, Branch::Zi)
+        StemBranch::from_stem_branch(Stem::Bing, Branch::Zi)
     );
-    assert_eq!(StemBranch::new(Stem::Bing, Branch::Zi).unwrap().ord(), 13);
+    assert_eq!(
+        StemBranch::from_stem_branch(Stem::Bing, Branch::Zi)
+            .unwrap()
+            .ord(),
+        13
+    );
     assert_eq!(
         StemBranch::from_ord(41),
-        StemBranch::new(Stem::Jia, Branch::Chen)
+        StemBranch::from_stem_branch(Stem::Jia, Branch::Chen)
     );
-    assert_eq!(StemBranch::new(Stem::Jia, Branch::Chen).unwrap().ord(), 41);
+    assert_eq!(
+        StemBranch::from_stem_branch(Stem::Jia, Branch::Chen)
+            .unwrap()
+            .ord(),
+        41
+    );
     assert_eq!(
         StemBranch::from_ord(60),
-        StemBranch::new(Stem::Gui, Branch::Hai)
+        StemBranch::from_stem_branch(Stem::Gui, Branch::Hai)
     );
-    assert_eq!(StemBranch::new(Stem::Gui, Branch::Hai).unwrap().ord(), 60);
+    assert_eq!(
+        StemBranch::from_stem_branch(Stem::Gui, Branch::Hai)
+            .unwrap()
+            .ord(),
+        60
+    );
 }
 
 #[derive(Debug, Clone, Copy, Derivative)]
@@ -396,7 +427,7 @@ fn test_year() {
     assert_eq!(year.branch(), Branch::Chou);
     assert_eq!(
         year.stem_branch(),
-        StemBranch::new(Stem::Xin, Branch::Chou).unwrap()
+        StemBranch::from_stem_branch(Stem::Xin, Branch::Chou).unwrap()
     );
     assert!(!year.is_leap());
     assert!(Year::from_y(2023).is_leap());
@@ -518,6 +549,22 @@ impl Day {
             }
         })
     }
+
+    pub fn from_ylmd(year: i32, leap: bool, month: u8, day: u8) -> Option<Self> {
+        Month::from_ylm(year, leap, month).and_then(|m| {
+            if day > 0 && day <= m.num_days() as u8 {
+                Some(Self::new(m, day - 1))
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn stem_branch(&self) -> StemBranch {
+        let date = self.as_date();
+        let repr = (date.jdn() + 18).rem_euclid(60) as usize;
+        StemBranch::new_with_repr(repr)
+    }
 }
 
 impl calendar::Day for Day {
@@ -560,6 +607,15 @@ impl calendar::Day for Day {
             + self.day as i64;
         Date::from_jdn(jdn)
     }
+}
+
+#[test]
+fn test_day() {
+    let day = Day::from_ymd(1949, 8, 10).unwrap();
+    assert_eq!(
+        day.stem_branch(),
+        StemBranch::from_stem_branch(Stem::Jia, Branch::Zi).unwrap()
+    );
 }
 
 impl std::fmt::Display for Year {
