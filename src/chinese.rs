@@ -30,7 +30,7 @@ const DAY_NAMES: [&str; 30] = [
 ];
 
 fn get_winter_solstice(year: i32, tz: f64) -> Date {
-    let mut d = GregorianDay::from_ymd(year, 12, 21).unwrap().as_date();
+    let mut d: Date = GregorianDay::from_ymd(year, 12, 21).unwrap().into();
     while d.solar_term(tz) != Some(WinterSolstice) {
         d = d.succ();
     }
@@ -48,12 +48,12 @@ fn get_prev_new_moon(date: Date, tz: f64) -> Date {
 fn calc_chinese_year_period_data(year: i32) -> (Date, Vec<u8>, Option<usize>) {
     let mut data = Vec::new();
     let last_ws = get_winter_solstice(year - 1, BEIJING_TZ);
-    let next_ws = get_winter_solstice(year, BEIJING_TZ);
+    let next_ws_p1 = get_winter_solstice(year, BEIJING_TZ).succ();
     let nm_before_last_ws = get_prev_new_moon(last_ws, BEIJING_TZ);
     let mut d = nm_before_last_ws;
     let mut last_nm = None;
     let mut has_mt = false;
-    while d != next_ws {
+    while d != next_ws_p1 {
         let lp = d.lunar_phase(BEIJING_TZ);
         let st = d.solar_term(BEIJING_TZ);
         if lp == NewMoon || st.is_some() {
@@ -74,21 +74,24 @@ fn calc_chinese_year_period_data(year: i32) -> (Date, Vec<u8>, Option<usize>) {
         d = d.succ();
     }
     let is_leap_year = data.len() > 12;
-    let mut leap_month = None;
-    for (i, (_, has_mt)) in data.iter().enumerate() {
-        if is_leap_year && leap_month.is_none() && !has_mt {
-            leap_month = Some(i);
+    let leap_month = if is_leap_year {
+        let mut i = 0;
+        loop {
+            if !data[i].1 {
+                break Some(i);
+            }
+            i += 1;
         }
-    }
+    } else {
+        None
+    };
     let data = data.into_iter().map(|(x, _)| x).collect();
     (nm_before_last_ws, data, leap_month)
 }
 
 fn calc_chinese_year_data(year: i32) -> (i64, [u8; 13], u8) {
-    let result1 = calc_chinese_year_period_data(year);
-    let result2 = calc_chinese_year_period_data(year + 1);
-    let (fd1, data1, lm1) = result1;
-    let (_, data2, lm2) = result2;
+    let (fd1, data1, lm1) = calc_chinese_year_period_data(year);
+    let (_, data2, lm2) = calc_chinese_year_period_data(year + 1);
     let (off1, nlm1) = match lm1 {
         Some(lm1) => {
             if lm1 <= 2 {
@@ -115,15 +118,32 @@ fn calc_chinese_year_data(year: i32) -> (i64, [u8; 13], u8) {
     }
     let num_days_of_months: [u8; 13] = data.try_into().unwrap();
     let nlm = nlm1.or(nlm2);
-    let mut fd = fd1 + data1[0] as i64 + data1[1] as i64;
-    if let Some(nlm1) = nlm1 {
-        if nlm1 <= 2 {
-            fd += data1[2] as i64;
-        }
-    }
+    let fd = fd1 + data1[..off1].iter().sum::<u8>() as i64;
     let first_day_jdn = fd.jdn();
     let leap_month = nlm.unwrap_or(13) as u8;
     (first_day_jdn, num_days_of_months, leap_month)
+}
+
+#[test]
+fn test_calc_chinese_year_data() {
+    let result = calc_chinese_year_data(2014);
+    assert_eq!(
+        result,
+        (
+            2456689,
+            [29, 30, 29, 30, 29, 30, 29, 30, 30, 29, 30, 29, 30],
+            9
+        )
+    );
+    let result = calc_chinese_year_data(2023);
+    assert_eq!(
+        result,
+        (
+            2459967,
+            [29, 30, 29, 29, 30, 30, 29, 30, 30, 29, 30, 29, 30],
+            2
+        )
+    );
 }
 
 #[derive(
@@ -403,14 +423,22 @@ impl calendar::Year for Year {
     }
 
     fn month(&self, ord: u8) -> Option<Month> {
-        if ord >= 1 && ord < self.num_months() as u8 {
+        if ord >= 1 && ord <= self.num_months() as u8 {
             Some(Month::new(*self, ord - 1))
         } else {
             None
         }
     }
 
-    fn day(&self, _ord: u16) -> Option<Day> {
+    fn day(&self, ord: u16) -> Option<Day> {
+        let mut ord = ord as usize;
+        for month_ord in 1..=self.num_months() as u8 {
+            let month = self.month(month_ord).unwrap();
+            if ord <= month.num_days() {
+                return month.day(ord as u8);
+            }
+            ord -= month.num_days();
+        }
         None
     }
 
@@ -431,6 +459,8 @@ fn test_year() {
     );
     assert!(!year.is_leap());
     assert!(Year::from_y(2023).is_leap());
+
+    assert_eq!(year.day(1), Day::from_ymd(2021, 1, 1));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -560,8 +590,23 @@ impl Day {
         })
     }
 
+    pub fn from_date_with_tz(date: Date, tz: f64) -> Self {
+        let gd = GregorianDay::from_date_with_tz(date, tz);
+        let cy = Year::from_y(gd.year().ord());
+        let cd = cy.first_day();
+        let cd_date = Date::from(cd);
+        if date >= cd_date {
+            cy.day((date - cd_date) as u16 + 1).unwrap()
+        } else {
+            let cy = cy.pred();
+            let cd = cy.first_day();
+            let cd_date = Date::from(cd);
+            cy.day((date - cd_date) as u16 + 1).unwrap()
+        }
+    }
+
     pub fn stem_branch(&self) -> StemBranch {
-        let date = self.as_date();
+        let date = Date::from(*self);
         let repr = (date.jdn() + 18).rem_euclid(60) as usize;
         StemBranch::new_with_repr(repr)
     }
@@ -598,14 +643,22 @@ impl calendar::Day for Day {
     fn month(&self) -> Self::Month {
         self.month
     }
+}
 
-    fn as_date(&self) -> Date {
-        let jdn = self.month.year.first_day_jdn
-            + (0..self.month.month)
-                .map(|m| self.month.year.num_days_of_months[m as usize] as i64)
+impl From<Day> for Date {
+    fn from(day: Day) -> Self {
+        let jdn = day.month.year.first_day_jdn
+            + (0..day.month.month)
+                .map(|m| day.month.year.num_days_of_months[m as usize] as i64)
                 .sum::<i64>()
-            + self.day as i64;
-        Date::from_jdn(jdn)
+            + day.day as i64;
+        Self::from_jdn(jdn)
+    }
+}
+
+impl From<Date> for Day {
+    fn from(date: Date) -> Self {
+        Self::from_date_with_tz(date, BEIJING_TZ)
     }
 }
 
@@ -620,13 +673,17 @@ fn test_day() {
 
 impl std::fmt::Display for Year {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "公元{}年农历{}{}年",
-            self.year,
-            self.stem().chinese(),
-            self.branch().chinese()
-        )
+        if f.alternate() {
+            write!(
+                f,
+                "公元{}年农历{}{}年",
+                self.year,
+                self.stem().chinese(),
+                self.branch().chinese()
+            )
+        } else {
+            write!(f, "{}{}年", self.stem().chinese(), self.branch().chinese())
+        }
     }
 }
 
@@ -638,16 +695,28 @@ impl std::fmt::Display for Month {
         } else {
             self.month - 1
         };
-        write!(
-            f,
-            "{}{}{}",
-            self.year, LEAP_NAMES[l as usize], MONTH_NAMES[m as usize]
-        )
+        if f.alternate() {
+            write!(
+                f,
+                "{:#}{}{}",
+                self.year, LEAP_NAMES[l as usize], MONTH_NAMES[m as usize]
+            )
+        } else {
+            write!(
+                f,
+                "{}{}{}",
+                self.year, LEAP_NAMES[l as usize], MONTH_NAMES[m as usize]
+            )
+        }
     }
 }
 
 impl std::fmt::Display for Day {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.month, DAY_NAMES[self.day as usize])
+        if f.alternate() {
+            write!(f, "{:#}{}", self.month, DAY_NAMES[self.day as usize])
+        } else {
+            write!(f, "{}{}", self.month, DAY_NAMES[self.day as usize])
+        }
     }
 }

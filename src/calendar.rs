@@ -72,7 +72,7 @@ pub trait Month: std::fmt::Display {
     }
 }
 
-pub trait Day: std::fmt::Display {
+pub trait Day: Clone + Copy + std::fmt::Display + Into<Date> {
     type Year: Year;
     type Month: Month;
 
@@ -93,8 +93,8 @@ pub trait Day: std::fmt::Display {
     fn is_leap(&self) -> bool {
         false
     }
-    fn as_date(&self) -> Date;
     fn weekday(&self) -> Weekday {
-        self.as_date().weekday()
+        let date: Date = (*self).into();
+        date.weekday()
     }
 }

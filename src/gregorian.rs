@@ -1,3 +1,4 @@
+/// Proleptic Gregorian calendar
 use strum::{AsRefStr, Display, EnumCount, EnumString, FromRepr, VariantArray};
 
 use crate::calendar;
@@ -6,6 +7,59 @@ use crate::date::*;
 
 #[cfg(test)]
 use std::str::FromStr;
+
+/// Converts a proleptic Gregorian date to a Julian day.
+pub fn proleptic_gregorian_to_julian_day(y: i32, m: u8, d: f64) -> f64 {
+    let (y, m) = if m > 2 { (y, m) } else { (y - 1, m + 12) };
+    let a = y.div_euclid(100);
+    let b = 2 - a + a.div_euclid(4);
+    (365.25 * (y + 4716) as f64).floor() + (30.6001 * (m + 1) as f64).floor() + d + b as f64
+        - 1524.5
+}
+
+/// Converts a Julian day to a proleptic Gregorian date.
+pub fn julian_day_to_proleptic_gregorian(jd: f64) -> (i32, u8, f64) {
+    let jd = jd + 0.5;
+    let z = jd.trunc();
+    let f = jd.fract();
+    let alpha = (z - 1867216.25).div_euclid(36524.25);
+    let a = z + 1.0 + alpha - alpha.div_euclid(4.0);
+    let b = a + 1524.0;
+    let c = (b - 122.1).div_euclid(365.25);
+    let d = (365.25 * c).floor();
+    let e = (b - d).div_euclid(30.6001);
+    let dom = b - d - (30.6001 * e).floor() + f;
+    let (y, m) = if e < 14.0 {
+        (c - 4716.0, e - 1.0)
+    } else {
+        (c - 4715.0, e - 13.0)
+    };
+    (y as i32, m as u8, dom)
+}
+
+#[cfg(test)]
+fn check_proleptic_gregorian_and_julian_day(y: i32, m: u8, d: f64, jd: f64) {
+    assert_eq!(proleptic_gregorian_to_julian_day(y, m, d), jd);
+    assert_eq!(julian_day_to_proleptic_gregorian(jd), (y, m, d));
+}
+
+#[test]
+fn test_proleptic_gregorian_and_julian_day() {
+    check_proleptic_gregorian_and_julian_day(2000, 1, 1.5, 2451545.0);
+    check_proleptic_gregorian_and_julian_day(1999, 1, 1.0, 2451179.5);
+    check_proleptic_gregorian_and_julian_day(1987, 1, 27.0, 2446822.5);
+    check_proleptic_gregorian_and_julian_day(1987, 6, 19.5, 2446966.0);
+    check_proleptic_gregorian_and_julian_day(1988, 1, 27.0, 2447187.5);
+    check_proleptic_gregorian_and_julian_day(1988, 6, 19.5, 2447332.0);
+    check_proleptic_gregorian_and_julian_day(1900, 1, 1.0, 2415020.5);
+    check_proleptic_gregorian_and_julian_day(1600, 1, 1.0, 2305447.5);
+    check_proleptic_gregorian_and_julian_day(1600, 12, 31.0, 2305812.5);
+    check_proleptic_gregorian_and_julian_day(1582, 10, 4.0, 2299149.5);
+    check_proleptic_gregorian_and_julian_day(1582, 10, 15.0, 2299160.5);
+    check_proleptic_gregorian_and_julian_day(1, 1, 1.0, 1721425.5);
+    check_proleptic_gregorian_and_julian_day(0, 1, 1.0, 1721059.5);
+    check_proleptic_gregorian_and_julian_day(-4713, 11, 24.5, 0.0);
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Year {
@@ -336,12 +390,8 @@ impl Day {
     }
 
     pub fn from_date_with_tz(date: Date, tz: f64) -> Self {
-        let (y, m, d) = astro::time::date_frm_julian_day(date.midnight_jd(tz)).unwrap();
+        let (y, m, d) = julian_day_to_proleptic_gregorian(date.midnight_jd(tz));
         Self::from_ymd(y as i32, m, d as u8).unwrap()
-    }
-
-    pub fn from_date(date: Date) -> Self {
-        Self::from_date_with_tz(date, 0.0)
     }
 }
 
@@ -376,29 +426,31 @@ impl calendar::Day for Day {
     fn month(&self) -> Month {
         self.month
     }
+}
 
-    fn as_date(&self) -> Date {
-        let day_of_month = astro::time::DayOfMonth {
-            day: self.ord(),
-            hr: 0,
-            min: 0,
-            sec: 0.0,
-            time_zone: 0.0,
-        };
-        let astro_date = astro::time::Date {
-            year: self.year().ord() as i16,
-            month: self.month.ord(),
-            decimal_day: astro::time::decimal_day(&day_of_month),
-            cal_type: astro::time::CalType::Gregorian,
-        };
-        Date::from_jd(astro::time::julian_day(&astro_date))
+impl From<Day> for Date {
+    fn from(day: Day) -> Self {
+        Date::from_jd(proleptic_gregorian_to_julian_day(
+            day.year().ord(),
+            day.month().ord(),
+            day.ord() as f64,
+        ))
+    }
+}
+
+impl From<Date> for Day {
+    fn from(date: Date) -> Self {
+        Self::from_date_with_tz(date, 0.0)
     }
 }
 
 #[test]
 fn test_day() {
-    assert_eq!(Day::from_ymd(-4713, 11, 24).unwrap().as_date().jdn(), 0);
-    assert_eq!(Day::from_ymd(2000, 1, 1).unwrap().as_date().jdn(), 2451545);
+    assert_eq!(Date::from(Day::from_ymd(-4713, 11, 24).unwrap()).jdn(), 0);
+    assert_eq!(
+        Date::from(Day::from_ymd(2000, 1, 1).unwrap()).jdn(),
+        2451545
+    );
 
     assert_eq!(Day::from_ymd(1582, 10, 15).unwrap().weekday(), Friday);
     assert_eq!(Day::from_ymd(1985, 9, 15).unwrap().weekday(), Sunday);

@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 use strum::VariantArray as _;
 
 use omnical::*;
@@ -37,22 +37,20 @@ struct PrintArgs {
     range: RangeArgs,
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum Calendar {
-    /// The Gregorian calendar.
-    Gregorian,
-    /// The Chinese calendar.
-    Chinese,
-}
-
 #[derive(Args, Debug)]
 struct ListOptionArgs {
+    /// Display the date in Chinese calendar.
+    #[arg(short, long)]
+    chinese: bool,
     /// Display the weekday.
     #[arg(short, long)]
     weekday: bool,
     /// Display the lunar phase.
     #[arg(short, long)]
     lunar_phase: bool,
+    /// Display the lunar phase emoji.
+    #[arg(short = 'e', long)]
+    lunar_phase_emoji: bool,
     /// Display the solar term if applicable.
     #[arg(short, long)]
     solar_term: bool,
@@ -60,9 +58,6 @@ struct ListOptionArgs {
 
 #[derive(Args, Debug)]
 struct ListArgs {
-    /// The calendar to list.
-    #[arg(value_enum, default_value_t = Calendar::Gregorian)]
-    calendar: Calendar,
     /// The range of the calendar to list.
     #[command(flatten)]
     range: RangeArgs,
@@ -86,7 +81,7 @@ fn parse_range(args: &RangeArgs) -> (i32, Option<u8>) {
             month: None,
         } => {
             let today = Date::from_unix_time_with_tz(now_in_unix_time(), 8.0);
-            let today = GregorianDay::from_date(today);
+            let today = GregorianDay::from(today);
             (today.year().ord(), Some(today.month().ord()))
         }
         _ => unreachable!(),
@@ -133,54 +128,50 @@ fn print_month(month: GregorianMonth) {
     }
 }
 
-fn list_month<M: Month>(month: M, options: &ListOptionArgs) {
+fn list_month<M: Month>(month: M, options: &ListOptionArgs, chinese_day: &mut Option<ChineseDay>) {
     for day in month.days() {
-        print!("{}", day);
+        let date: Date = day.into();
+        print!("{:#}", day);
+        if options.chinese {
+            if chinese_day.is_none() {
+                *chinese_day = Some(ChineseDay::from(date));
+            } else {
+                *chinese_day = Some(chinese_day.unwrap().succ());
+            }
+            print!(" {}", chinese_day.unwrap());
+        }
         if options.weekday {
-            print!(" {:-}", day.weekday());
+            print!(" {:#}", day.weekday());
         }
         if options.lunar_phase {
-            print!(" {}", day.as_date().lunar_phase(8.0));
+            print!(" {}", date.lunar_phase(8.0).chinese());
+        }
+        if options.lunar_phase_emoji {
+            print!(" {}", date.lunar_phase(8.0).emoji());
         }
         if options.solar_term {
-            if let Some(st) = day.as_date().solar_term(8.0) {
-                print!(" {}", st);
+            if let Some(st) = date.solar_term(8.0) {
+                print!(" {}", st.chinese());
             }
         }
         println!();
     }
 }
 
-fn list_year<Y: Year>(year: Y, options: &ListOptionArgs) {
+fn list_year<Y: Year>(year: Y, options: &ListOptionArgs, chinese_day: &mut Option<ChineseDay>) {
     for month in year.months() {
-        list_month(month, options);
+        list_month(month, options, chinese_day);
     }
 }
 
 fn list_dates(args: &ListArgs) {
     let (y, m) = parse_range(&args.range);
     if let Some(m) = m {
-        match args.calendar {
-            Calendar::Gregorian => {
-                let month = GregorianMonth::from_ym(y, m).unwrap();
-                list_month(month, &args.option)
-            }
-            Calendar::Chinese => {
-                let month = ChineseMonth::from_ym(y, m).unwrap();
-                list_month(month, &args.option)
-            }
-        }
+        let month = GregorianMonth::from_ym(y, m).unwrap();
+        list_month(month, &args.option, &mut None);
     } else {
-        match args.calendar {
-            Calendar::Gregorian => {
-                let year = GregorianYear::from_y(y);
-                list_year(year, &args.option)
-            }
-            Calendar::Chinese => {
-                let year = ChineseYear::from_y(y);
-                list_year(year, &args.option)
-            }
-        }
+        let year = GregorianYear::from_y(y);
+        list_year(year, &args.option, &mut None);
     }
 }
 

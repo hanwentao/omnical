@@ -5,12 +5,6 @@ use crate::astronomy::*;
 #[cfg(test)]
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy)]
-pub enum Calendar {
-    Gregorian,
-    Chinese,
-}
-
 /// The 7 days of the week.
 #[derive(
     Debug,
