@@ -4,6 +4,10 @@ pub trait Calendar: Sized {
     type Year: Year<Self>;
     type Month: Month<Self>;
     type Day: Day<Self>;
+
+    fn from_y(year: i16) -> Self::Year;
+    fn from_ymo(year: i16, month: u8) -> Option<Self::Month>;
+    fn from_ymdo(year: i16, month: u8, day: u8) -> Option<Self::Day>;
 }
 
 pub trait Year<C: Calendar>: Sized + std::fmt::Display {

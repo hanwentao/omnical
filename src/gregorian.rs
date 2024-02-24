@@ -13,7 +13,7 @@ pub fn proleptic_gregorian_to_julian_day(y: i16, m: u8, d: f64) -> f64 {
     let (y, m) = if m > 2 { (y, m) } else { (y - 1, m + 12) };
     let a = y.div_euclid(100);
     let b = 2 - a + a.div_euclid(4);
-    (365.25 * (y + 4716) as f64).floor() + (30.6001 * (m + 1) as f64).floor() + d + b as f64
+    (365.25 * (y as i32 + 4716) as f64).floor() + (30.6001 * (m + 1) as f64).floor() + d + b as f64
         - 1524.5
 }
 
@@ -67,6 +67,28 @@ impl calendar::Calendar for Calendar {
     type Year = Year;
     type Month = Month;
     type Day = Day;
+
+    fn from_y(year: i16) -> Year {
+        Year::from_y(year)
+    }
+
+    fn from_ymo(year: i16, month: u8) -> Option<Month> {
+        Month::from_ym(year, month)
+    }
+
+    fn from_ymdo(year: i16, month: u8, day: u8) -> Option<Day> {
+        Day::from_ymd(year, month, day)
+    }
+}
+
+impl Calendar {
+    pub fn from_yn(year: i16, month: MonthName) -> Month {
+        Month::from_yn(year, month)
+    }
+
+    pub fn from_yndo(year: i16, month: MonthName, day: u8) -> Option<Day> {
+        Day::from_ynd(year, month, day)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -79,12 +101,8 @@ impl Year {
         Self { year }
     }
 
-    pub fn from_ord(ord: i16) -> Self {
-        Self::new(ord)
-    }
-
     pub fn from_y(y: i16) -> Self {
-        Self::from_ord(y)
+        Self::new(y)
     }
 
     pub fn month_by_name(&self, month_name: MonthName) -> Month {

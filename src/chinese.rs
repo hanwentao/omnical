@@ -89,7 +89,7 @@ fn calc_chinese_year_period_data(year: i16) -> (Date, Vec<u8>, Option<usize>) {
     (nm_before_last_ws, data, leap_month)
 }
 
-fn calc_chinese_year_data(year: i16) -> (u32, [u8; 13], u8) {
+fn calc_chinese_year_data(year: i16) -> (Date, [u8; 13], u8) {
     let (fd1, data1, lm1) = calc_chinese_year_period_data(year);
     let (_, data2, lm2) = calc_chinese_year_period_data(year + 1);
     let (off1, nlm1) = match lm1 {
@@ -119,9 +119,8 @@ fn calc_chinese_year_data(year: i16) -> (u32, [u8; 13], u8) {
     let num_days_of_months: [u8; 13] = data.try_into().unwrap();
     let nlm = nlm1.or(nlm2);
     let fd = fd1 + data1[..off1].iter().sum::<u8>() as i32;
-    let first_day_jdn = fd.jdn();
     let leap_month = nlm.unwrap_or(13) as u8;
-    (first_day_jdn, num_days_of_months, leap_month)
+    (fd, num_days_of_months, leap_month)
 }
 
 #[test]
@@ -130,7 +129,7 @@ fn test_calc_chinese_year_data() {
     assert_eq!(
         result,
         (
-            2456689,
+            Date::from_jdn(2456689),
             [29, 30, 29, 30, 29, 30, 29, 30, 30, 29, 30, 29, 30],
             9
         )
@@ -139,7 +138,7 @@ fn test_calc_chinese_year_data() {
     assert_eq!(
         result,
         (
-            2459967,
+            Date::from_jdn(2459967),
             [29, 30, 29, 29, 30, 30, 29, 30, 30, 29, 30, 29, 30],
             2
         )
@@ -360,6 +359,28 @@ impl calendar::Calendar for Calendar {
     type Year = Year;
     type Month = Month;
     type Day = Day;
+
+    fn from_y(year: i16) -> Self::Year {
+        Year::from_y(year)
+    }
+
+    fn from_ymo(year: i16, month: u8) -> Option<Self::Month> {
+        Month::from_ym(year, month)
+    }
+
+    fn from_ymdo(year: i16, month: u8, day: u8) -> Option<Self::Day> {
+        Day::from_ymd(year, month, day)
+    }
+}
+
+impl Calendar {
+    pub fn from_ylmo(year: i16, leap: bool, month: u8) -> Option<Month> {
+        Month::from_ylm(year, leap, month)
+    }
+
+    pub fn from_ylmdo(year: i16, leap: bool, month: u8, day: u8) -> Option<Day> {
+        Day::from_ylmd(year, leap, month, day)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Derivative)]
@@ -367,7 +388,7 @@ impl calendar::Calendar for Calendar {
 pub struct Year {
     year: i16,
     #[derivative(PartialEq = "ignore")]
-    first_day_jdn: u32,
+    first_day: Date,
     #[derivative(PartialEq = "ignore")]
     num_days_of_months: [u8; 13],
     #[derivative(PartialEq = "ignore")]
@@ -376,21 +397,17 @@ pub struct Year {
 
 impl Year {
     fn new(year: i16) -> Self {
-        let (first_day_jdn, num_days_of_months, leap_month) = calc_chinese_year_data(year);
+        let (first_day, num_days_of_months, leap_month) = calc_chinese_year_data(year);
         Self {
             year,
-            first_day_jdn,
+            first_day,
             num_days_of_months,
             leap_month,
         }
     }
 
-    pub fn from_ord(ord: i16) -> Self {
-        Self::new(ord)
-    }
-
     pub fn from_y(year: i16) -> Self {
-        Self::from_ord(year)
+        Self::new(year)
     }
 
     pub fn stem(&self) -> Stem {
@@ -468,12 +485,12 @@ impl Month {
     }
 
     pub fn from_ym(year: i16, month: u8) -> Option<Self> {
-        let year = Year::from_ord(year);
+        let year = Year::from_y(year);
         year.month(month)
     }
 
     pub fn from_ylm(year: i16, leap: bool, month: u8) -> Option<Self> {
-        let year = Year::from_ord(year);
+        let year = Year::from_y(year);
         if leap && month != year.leap_month {
             None
         } else if month < year.leap_month || !leap && month == year.leap_month {
@@ -634,12 +651,11 @@ impl calendar::Day<Calendar> for Day {
 
 impl From<Day> for Date {
     fn from(day: Day) -> Self {
-        let jdn = day.month.year.first_day_jdn
+        day.the_year().first_day
             + (0..day.month.month)
-                .map(|m| day.month.year.num_days_of_months[m as usize] as u32)
-                .sum::<u32>()
-            + day.day as u32;
-        Self::from_jdn(jdn)
+                .map(|m| day.the_year().num_days_of_months[m as usize] as i32)
+                .sum::<i32>()
+            + day.day as i32
     }
 }
 
