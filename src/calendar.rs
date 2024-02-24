@@ -57,7 +57,7 @@ pub trait Month<C: Calendar>: Sized + std::fmt::Display {
     fn succ(&self) -> Self;
     fn pred(&self) -> Self;
 
-    fn year(&self) -> C::Year;
+    fn the_year(&self) -> C::Year;
 
     fn num_days(&self) -> usize;
     fn day(&self, ord: u8) -> Option<C::Day>;
@@ -79,8 +79,8 @@ pub trait Month<C: Calendar>: Sized + std::fmt::Display {
 pub trait Day<C: Calendar>: Sized + Clone + Copy + std::fmt::Display + Into<Date> {
     fn ord(&self) -> u8;
     fn ord_in_year(&self) -> u16 {
-        (1..self.month().ord())
-            .map(|m| self.year().month(m).unwrap().num_days() as u16)
+        (1..self.the_month().ord())
+            .map(|m| self.the_year().month(m).unwrap().num_days() as u16)
             .sum::<u16>()
             + self.ord() as u16
             + 1
@@ -88,8 +88,8 @@ pub trait Day<C: Calendar>: Sized + Clone + Copy + std::fmt::Display + Into<Date
     fn succ(&self) -> Self;
     fn pred(&self) -> Self;
 
-    fn year(&self) -> C::Year;
-    fn month(&self) -> C::Month;
+    fn the_year(&self) -> C::Year;
+    fn the_month(&self) -> C::Month;
 
     fn is_leap(&self) -> bool {
         false

@@ -82,7 +82,7 @@ fn parse_range(args: &RangeArgs) -> (i16, Option<u8>) {
         } => {
             let today = Date::from_unix_time_with_tz(now_in_unix_time(), 8.0);
             let today = GregorianDay::from(today);
-            (today.year().ord(), Some(today.month().ord()))
+            (today.the_year().ord(), Some(today.the_month().ord()))
         }
         _ => unreachable!(),
     }

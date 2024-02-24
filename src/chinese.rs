@@ -505,7 +505,7 @@ impl calendar::Month<Calendar> for Month {
         }
     }
 
-    fn year(&self) -> Year {
+    fn the_year(&self) -> Year {
         self.year
     }
 
@@ -582,7 +582,7 @@ impl Day {
 
     pub fn from_date_with_tz(date: Date, tz: f64) -> Self {
         let gd = GregorianDay::from_date_with_tz(date, tz);
-        let cy = Year::from_y(gd.year().ord());
+        let cy = Year::from_y(gd.the_year().ord());
         let cd = cy.first_day();
         let cd_date = Date::from(cd);
         if date >= cd_date {
@@ -623,11 +623,11 @@ impl calendar::Day<Calendar> for Day {
         }
     }
 
-    fn year(&self) -> Year {
+    fn the_year(&self) -> Year {
         self.month.year
     }
 
-    fn month(&self) -> Month {
+    fn the_month(&self) -> Month {
         self.month
     }
 }

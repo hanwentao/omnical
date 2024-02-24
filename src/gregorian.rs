@@ -302,7 +302,7 @@ impl calendar::Month<Calendar> for Month {
         }
     }
 
-    fn year(&self) -> Year {
+    fn the_year(&self) -> Year {
         self.year
     }
 
@@ -338,7 +338,7 @@ impl calendar::Month<Calendar> for Month {
 #[test]
 fn test_month() {
     let month = Month::from_yn(1985, September);
-    assert_eq!(month.year().ord(), 1985);
+    assert_eq!(month.the_year().ord(), 1985);
     assert_eq!(month.ord(), 9);
     assert!(!month.is_leap());
     assert_eq!(month.num_days(), 30);
@@ -415,11 +415,11 @@ impl calendar::Day<Calendar> for Day {
         }
     }
 
-    fn year(&self) -> Year {
+    fn the_year(&self) -> Year {
         self.month.year
     }
 
-    fn month(&self) -> Month {
+    fn the_month(&self) -> Month {
         self.month
     }
 }
@@ -427,8 +427,8 @@ impl calendar::Day<Calendar> for Day {
 impl From<Day> for Date {
     fn from(day: Day) -> Self {
         Date::from_jd(proleptic_gregorian_to_julian_day(
-            day.year().ord(),
-            day.month().ord(),
+            day.the_year().ord(),
+            day.the_month().ord(),
             day.ord() as f64,
         ))
     }
@@ -488,11 +488,11 @@ impl std::fmt::Display for Month {
 impl std::fmt::Display for Day {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
-            write!(f, "{:#}{}日", self.month(), self.ord())
+            write!(f, "{:#}{}日", self.the_month(), self.ord())
         } else if f.sign_minus() {
             write!(f, "{} {:-}", self.ord(), self.month)
         } else {
-            write!(f, "{}-{:02}", self.month(), self.ord())
+            write!(f, "{}-{:02}", self.the_month(), self.ord())
         }
     }
 }
