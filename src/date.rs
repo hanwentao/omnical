@@ -1,6 +1,7 @@
 use strum::{AsRefStr, EnumCount, EnumProperty, EnumString, FromRepr, VariantArray};
 
 use crate::astronomy::*;
+use crate::*;
 
 #[cfg(test)]
 use std::str::FromStr;
@@ -20,19 +21,26 @@ use std::str::FromStr;
     EnumProperty,
 )]
 pub enum Weekday {
-    #[strum(props(zh = "星期一"))]
+    /// Monday, the first day of the week.
+    #[strum(props(zh = "星期一", zh2 = "周一", zh1 = "一"))]
     Monday,
-    #[strum(props(zh = "星期二"))]
+    /// Tuesday, the second day of the week.
+    #[strum(props(zh = "星期二", zh2 = "周二", zh1 = "二"))]
     Tuesday,
-    #[strum(props(zh = "星期三"))]
+    /// Wednesday, the third day of the week.
+    #[strum(props(zh = "星期三", zh2 = "周三", zh1 = "三"))]
     Wednesday,
-    #[strum(props(zh = "星期四"))]
+    /// Thursday, the fourth day of the week.
+    #[strum(props(zh = "星期四", zh2 = "周四", zh1 = "四"))]
     Thursday,
-    #[strum(props(zh = "星期五"))]
+    /// Friday, the fifth day of the week.
+    #[strum(props(zh = "星期五", zh2 = "周五", zh1 = "五"))]
     Friday,
-    #[strum(props(zh = "星期六"))]
+    /// Saturday, the sixth day of the week.
+    #[strum(props(zh = "星期六", zh2 = "周六", zh1 = "六"))]
     Saturday,
-    #[strum(props(zh = "星期日"))]
+    /// Sunday, the seventh day of the week.
+    #[strum(props(zh = "星期日", zh2 = "周日", zh1 = "日"))]
     Sunday,
 }
 
@@ -40,38 +48,76 @@ pub use Weekday::*;
 
 impl Weekday {
     /// The ordinal of the variant.
-    pub fn ord(&self) -> u8 {
+    pub const fn ord(&self) -> u8 {
         *self as u8 + 1
     }
 
     /// Create a variant from its ordinal.
-    pub fn from_ord(ord: u8) -> Option<Self> {
+    pub const fn from_ord(ord: u8) -> Option<Self> {
         Self::from_repr((ord as isize - 1) as usize)
     }
 
     /// The first variant.
-    pub fn first() -> Self {
+    pub const fn first() -> Self {
         Monday
     }
 
     /// The last variant.
-    pub fn last() -> Self {
+    pub const fn last() -> Self {
         Sunday
     }
 
     /// The next variant.
-    pub fn succ(&self) -> Self {
-        Self::from_repr((*self as i8 + 1).rem_euclid(Self::COUNT as i8) as usize).unwrap()
+    pub const fn succ(&self) -> Self {
+        *ignore_none(&Self::from_repr(
+            (*self as isize + 1).rem_euclid(Self::COUNT as isize) as usize,
+        ))
     }
 
     /// The previous variant.
     pub fn pred(&self) -> Self {
-        Self::from_repr((*self as i8 - 1).rem_euclid(Self::COUNT as i8) as usize).unwrap()
+        *ignore_none(&Self::from_repr(
+            (*self as isize - 1).rem_euclid(Self::COUNT as isize) as usize,
+        ))
     }
 
     /// Chinese name of the variant.
-    pub fn chinese(&self) -> &str {
-        self.get_str("zh").unwrap()
+    ///
+    /// # Arguments
+    ///
+    /// * `length` - The length of the Chinese name, see examples below.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omnical::*;
+    /// assert_eq!(Weekday::Monday.chinese(1), "一");
+    /// assert_eq!(Weekday::Monday.chinese(2), "周一");
+    /// assert_eq!(Weekday::Monday.chinese(3), "星期一");
+    /// assert_eq!(Weekday::Monday.chinese(0), "星期一");
+    /// ```
+    pub fn chinese(&self, length: usize) -> &str {
+        match length {
+            1 => self.get_str("zh1").unwrap(),
+            2 => self.get_str("zh2").unwrap(),
+            _ => self.get_str("zh").unwrap(),
+        }
+    }
+}
+
+impl std::fmt::Display for Weekday {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, "{}", self.chinese(f.width().unwrap_or(0)))
+        } else if let Some(width) = f.width() {
+            if self.as_ref().len() > width {
+                write!(f, "{}", &self.as_ref()[..width])
+            } else {
+                f.pad(self.as_ref())
+            }
+        } else {
+            write!(f, "{}", self.as_ref())
+        }
     }
 }
 
@@ -102,9 +148,13 @@ fn test_weekday() {
     assert_eq!(Monday.pred(), Sunday);
     assert_eq!(Sunday.pred(), Saturday);
     assert_eq!(Sunday.succ(), Monday);
+
+    assert_eq!(format!("{:#}", sun), "星期日");
+    assert_eq!(format!("{:#2}", sun), "周日");
+    assert_eq!(format!("{:#1}", sun), "日");
 }
 
-/// A generic date type using Julian Day Number (JDN) as its internal representation.
+/// A generic date type using Julian day number (JDN) as its internal representation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Date {
     jdn: u32,
@@ -245,21 +295,4 @@ fn test_date() {
     assert_eq!(Date::from_jdn(2460292).lunar_phase(8.0), NewMoon);
 
     assert_eq!(d2 - d1, 1);
-}
-
-pub fn now_in_unix_time() -> u64 {
-    let now = std::time::SystemTime::now();
-    now.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
-}
-
-impl std::fmt::Display for Weekday {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if f.alternate() {
-            write!(f, "{}", self.chinese())
-        } else if f.sign_minus() {
-            write!(f, "{}", &self.as_ref()[..3])
-        } else {
-            write!(f, "{}", self.as_ref())
-        }
-    }
 }

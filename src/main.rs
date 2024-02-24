@@ -80,7 +80,7 @@ fn parse_range(args: &RangeArgs) -> (i16, Option<u8>) {
             year: None,
             month: None,
         } => {
-            let today = Date::from_unix_time_with_tz(now_in_unix_time(), 8.0);
+            let today = Date::from_unix_time_with_tz(unix_time_now(), 8.0);
             let today = GregorianDay::from(today);
             (today.the_year().ord(), Some(today.the_month().ord()))
         }
@@ -110,12 +110,12 @@ fn print_year(year: GregorianYear) {
 
 fn print_month(month: GregorianMonth) {
     for weekday in Weekday::VARIANTS {
-        print!("{:>4}", &weekday.to_string()[..3]);
+        print!(" {:3}", weekday);
     }
     println!();
     let days = month.days();
     for _ in 0..month.first_day().weekday() as u8 {
-        print!("{:>4}", "");
+        print!("    ");
     }
     for day in days {
         print!("{:>4}", day.ord());
