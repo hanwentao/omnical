@@ -25,7 +25,7 @@ enum Commands {
 #[derive(Args, Debug)]
 struct RangeArgs {
     /// The year.
-    year: Option<i32>,
+    year: Option<i16>,
     /// The month.
     month: Option<u8>,
 }
@@ -66,7 +66,7 @@ struct ListArgs {
     option: ListOptionArgs,
 }
 
-fn parse_range(args: &RangeArgs) -> (i32, Option<u8>) {
+fn parse_range(args: &RangeArgs) -> (i16, Option<u8>) {
     match args {
         RangeArgs {
             year: Some(y),
@@ -114,21 +114,25 @@ fn print_month(month: GregorianMonth) {
     }
     println!();
     let days = month.days();
-    for _ in 0..days.first().unwrap().weekday() as u8 {
+    for _ in 0..month.first_day().weekday() as u8 {
         print!("{:>4}", "");
     }
-    for day in &days {
+    for day in days {
         print!("{:>4}", day.ord());
         if day.weekday() == Weekday::last() {
             println!();
         }
     }
-    if days.last().unwrap().weekday() != Weekday::last() {
+    if month.last_day().weekday() != Weekday::last() {
         println!();
     }
 }
 
-fn list_month<M: Month>(month: M, options: &ListOptionArgs, chinese_day: &mut Option<ChineseDay>) {
+fn list_month(
+    month: GregorianMonth,
+    options: &ListOptionArgs,
+    chinese_day: &mut Option<ChineseDay>,
+) {
     for day in month.days() {
         let date: Date = day.into();
         print!("{:#}", day);
@@ -158,7 +162,7 @@ fn list_month<M: Month>(month: M, options: &ListOptionArgs, chinese_day: &mut Op
     }
 }
 
-fn list_year<Y: Year>(year: Y, options: &ListOptionArgs, chinese_day: &mut Option<ChineseDay>) {
+fn list_year(year: GregorianYear, options: &ListOptionArgs, chinese_day: &mut Option<ChineseDay>) {
     for month in year.months() {
         list_month(month, options, chinese_day);
     }

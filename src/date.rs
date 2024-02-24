@@ -107,31 +107,31 @@ fn test_weekday() {
 /// A generic date type using Julian Day Number (JDN) as its internal representation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Date {
-    jdn: i64,
+    jdn: u32,
 }
 
 impl Date {
-    fn new(jdn: i64) -> Self {
+    fn new(jdn: u32) -> Self {
         Self { jdn }
     }
 
-    pub fn from_jdn(jdn: i64) -> Self {
+    pub fn from_jdn(jdn: u32) -> Self {
         Self::new(jdn)
     }
 
-    pub fn jdn(&self) -> i64 {
+    pub fn jdn(&self) -> u32 {
         self.jdn
     }
 
     pub fn from_jd(jd: f64) -> Self {
         Self {
-            jdn: (jd + 0.5).floor() as i64,
+            jdn: (jd + 0.5).floor() as u32,
         }
     }
 
     pub fn from_jd_with_tz(jd: f64, tz: f64) -> Self {
         Self {
-            jdn: (jd + 0.5 - tz / 24.0).floor() as i64,
+            jdn: (jd + 0.5 - tz / 24.0).floor() as u32,
         }
     }
 
@@ -190,23 +190,23 @@ impl Date {
     }
 }
 
-impl std::ops::AddAssign<i64> for Date {
-    fn add_assign(&mut self, rhs: i64) {
-        self.jdn += rhs;
+impl std::ops::AddAssign<i32> for Date {
+    fn add_assign(&mut self, rhs: i32) {
+        self.jdn = self.jdn.saturating_add_signed(rhs);
     }
 }
 
-impl std::ops::Add<i64> for Date {
+impl std::ops::Add<i32> for Date {
     type Output = Self;
 
-    fn add(self, rhs: i64) -> Self::Output {
+    fn add(self, rhs: i32) -> Self::Output {
         let mut result = self;
         result += rhs;
         result
     }
 }
 
-impl std::ops::Add<Date> for i64 {
+impl std::ops::Add<Date> for i32 {
     type Output = Date;
 
     fn add(self, rhs: Date) -> Self::Output {
@@ -217,10 +217,10 @@ impl std::ops::Add<Date> for i64 {
 }
 
 impl std::ops::Sub for Date {
-    type Output = i64;
+    type Output = i32;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        self.jdn - rhs.jdn
+        self.jdn as i32 - rhs.jdn as i32
     }
 }
 

@@ -29,7 +29,7 @@ const DAY_NAMES: [&str; 30] = [
     "廿五", "廿六", "廿七", "廿八", "廿九", "三十",
 ];
 
-fn get_winter_solstice(year: i32, tz: f64) -> Date {
+fn get_winter_solstice(year: i16, tz: f64) -> Date {
     let mut d: Date = GregorianDay::from_ymd(year, 12, 21).unwrap().into();
     while d.solar_term(tz) != Some(WinterSolstice) {
         d = d.succ();
@@ -45,7 +45,7 @@ fn get_prev_new_moon(date: Date, tz: f64) -> Date {
     d
 }
 
-fn calc_chinese_year_period_data(year: i32) -> (Date, Vec<u8>, Option<usize>) {
+fn calc_chinese_year_period_data(year: i16) -> (Date, Vec<u8>, Option<usize>) {
     let mut data = Vec::new();
     let last_ws = get_winter_solstice(year - 1, BEIJING_TZ);
     let next_ws_p1 = get_winter_solstice(year, BEIJING_TZ).succ();
@@ -89,7 +89,7 @@ fn calc_chinese_year_period_data(year: i32) -> (Date, Vec<u8>, Option<usize>) {
     (nm_before_last_ws, data, leap_month)
 }
 
-fn calc_chinese_year_data(year: i32) -> (i64, [u8; 13], u8) {
+fn calc_chinese_year_data(year: i16) -> (u32, [u8; 13], u8) {
     let (fd1, data1, lm1) = calc_chinese_year_period_data(year);
     let (_, data2, lm2) = calc_chinese_year_period_data(year + 1);
     let (off1, nlm1) = match lm1 {
@@ -118,7 +118,7 @@ fn calc_chinese_year_data(year: i32) -> (i64, [u8; 13], u8) {
     }
     let num_days_of_months: [u8; 13] = data.try_into().unwrap();
     let nlm = nlm1.or(nlm2);
-    let fd = fd1 + data1[..off1].iter().sum::<u8>() as i64;
+    let fd = fd1 + data1[..off1].iter().sum::<u8>() as i32;
     let first_day_jdn = fd.jdn();
     let leap_month = nlm.unwrap_or(13) as u8;
     (first_day_jdn, num_days_of_months, leap_month)
@@ -191,8 +191,8 @@ impl Stem {
         Self::from_repr((ord - 1) as usize)
     }
 
-    pub fn from_year(year: i32) -> Self {
-        Self::from_repr((year - 4).rem_euclid(Self::COUNT as i32) as usize).unwrap()
+    pub fn from_year(year: i16) -> Self {
+        Self::from_repr((year - 4).rem_euclid(Self::COUNT as i16) as usize).unwrap()
     }
 
     pub fn chinese(&self) -> &str {
@@ -249,8 +249,8 @@ impl Branch {
         Self::from_repr((ord - 1) as usize)
     }
 
-    pub fn from_year(year: i32) -> Self {
-        Self::from_repr((year - 4).rem_euclid(Self::COUNT as i32) as usize).unwrap()
+    pub fn from_year(year: i16) -> Self {
+        Self::from_repr((year - 4).rem_euclid(Self::COUNT as i16) as usize).unwrap()
     }
 
     pub fn chinese(&self) -> &str {
@@ -295,7 +295,7 @@ impl StemBranch {
         Some(Self::new(stem, branch))
     }
 
-    pub fn from_year(year: i32) -> Self {
+    pub fn from_year(year: i16) -> Self {
         Self::new(Stem::from_year(year), Branch::from_year(year))
     }
 }
@@ -354,12 +354,20 @@ fn test_stem_branch() {
     );
 }
 
+pub struct Calendar;
+
+impl calendar::Calendar for Calendar {
+    type Year = Year;
+    type Month = Month;
+    type Day = Day;
+}
+
 #[derive(Debug, Clone, Copy, Derivative)]
 #[derivative(PartialEq, Eq)]
 pub struct Year {
-    year: i32,
+    year: i16,
     #[derivative(PartialEq = "ignore")]
-    first_day_jdn: i64,
+    first_day_jdn: u32,
     #[derivative(PartialEq = "ignore")]
     num_days_of_months: [u8; 13],
     #[derivative(PartialEq = "ignore")]
@@ -367,7 +375,7 @@ pub struct Year {
 }
 
 impl Year {
-    fn new(year: i32) -> Self {
+    fn new(year: i16) -> Self {
         let (first_day_jdn, num_days_of_months, leap_month) = calc_chinese_year_data(year);
         Self {
             year,
@@ -377,11 +385,11 @@ impl Year {
         }
     }
 
-    pub fn from_ord(ord: i32) -> Self {
+    pub fn from_ord(ord: i16) -> Self {
         Self::new(ord)
     }
 
-    pub fn from_y(year: i32) -> Self {
+    pub fn from_y(year: i16) -> Self {
         Self::from_ord(year)
     }
 
@@ -398,11 +406,8 @@ impl Year {
     }
 }
 
-impl calendar::Year for Year {
-    type Month = Month;
-    type Day = Day;
-
-    fn ord(&self) -> i32 {
+impl calendar::Year<Calendar> for Year {
+    fn ord(&self) -> i16 {
         self.year
     }
 
@@ -428,18 +433,6 @@ impl calendar::Year for Year {
         } else {
             None
         }
-    }
-
-    fn day(&self, ord: u16) -> Option<Day> {
-        let mut ord = ord as usize;
-        for month_ord in 1..=self.num_months() as u8 {
-            let month = self.month(month_ord).unwrap();
-            if ord <= month.num_days() {
-                return month.day(ord as u8);
-            }
-            ord -= month.num_days();
-        }
-        None
     }
 
     fn is_leap(&self) -> bool {
@@ -474,12 +467,12 @@ impl Month {
         Self { year, month }
     }
 
-    pub fn from_ym(year: i32, month: u8) -> Option<Self> {
+    pub fn from_ym(year: i16, month: u8) -> Option<Self> {
         let year = Year::from_ord(year);
         year.month(month)
     }
 
-    pub fn from_ylm(year: i32, leap: bool, month: u8) -> Option<Self> {
+    pub fn from_ylm(year: i16, leap: bool, month: u8) -> Option<Self> {
         let year = Year::from_ord(year);
         if leap && month != year.leap_month {
             None
@@ -491,10 +484,7 @@ impl Month {
     }
 }
 
-impl calendar::Month for Month {
-    type Year = Year;
-    type Day = Day;
-
+impl calendar::Month<Calendar> for Month {
     fn ord(&self) -> u8 {
         self.month + 1
     }
@@ -515,7 +505,7 @@ impl calendar::Month for Month {
         }
     }
 
-    fn year(&self) -> Self::Year {
+    fn year(&self) -> Year {
         self.year
     }
 
@@ -523,7 +513,7 @@ impl calendar::Month for Month {
         self.year.num_days_of_months[self.month as usize] as usize
     }
 
-    fn day(&self, ord: u8) -> Option<Self::Day> {
+    fn day(&self, ord: u8) -> Option<Day> {
         if ord > 0 && ord <= self.num_days() as u8 {
             Some(Day::new(*self, ord - 1))
         } else {
@@ -570,7 +560,7 @@ impl Day {
         Self { month, day }
     }
 
-    pub fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
+    pub fn from_ymd(year: i16, month: u8, day: u8) -> Option<Self> {
         Month::from_ym(year, month).and_then(|m| {
             if day > 0 && day <= m.num_days() as u8 {
                 Some(Self::new(m, day - 1))
@@ -580,7 +570,7 @@ impl Day {
         })
     }
 
-    pub fn from_ylmd(year: i32, leap: bool, month: u8, day: u8) -> Option<Self> {
+    pub fn from_ylmd(year: i16, leap: bool, month: u8, day: u8) -> Option<Self> {
         Month::from_ylm(year, leap, month).and_then(|m| {
             if day > 0 && day <= m.num_days() as u8 {
                 Some(Self::new(m, day - 1))
@@ -612,10 +602,7 @@ impl Day {
     }
 }
 
-impl calendar::Day for Day {
-    type Year = Year;
-    type Month = Month;
-
+impl calendar::Day<Calendar> for Day {
     fn ord(&self) -> u8 {
         self.day + 1
     }
@@ -636,11 +623,11 @@ impl calendar::Day for Day {
         }
     }
 
-    fn year(&self) -> Self::Year {
+    fn year(&self) -> Year {
         self.month.year
     }
 
-    fn month(&self) -> Self::Month {
+    fn month(&self) -> Month {
         self.month
     }
 }
@@ -649,9 +636,9 @@ impl From<Day> for Date {
     fn from(day: Day) -> Self {
         let jdn = day.month.year.first_day_jdn
             + (0..day.month.month)
-                .map(|m| day.month.year.num_days_of_months[m as usize] as i64)
-                .sum::<i64>()
-            + day.day as i64;
+                .map(|m| day.month.year.num_days_of_months[m as usize] as u32)
+                .sum::<u32>()
+            + day.day as u32;
         Self::from_jdn(jdn)
     }
 }

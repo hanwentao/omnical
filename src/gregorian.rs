@@ -9,7 +9,7 @@ use crate::date::*;
 use std::str::FromStr;
 
 /// Converts a proleptic Gregorian date to a Julian day.
-pub fn proleptic_gregorian_to_julian_day(y: i32, m: u8, d: f64) -> f64 {
+pub fn proleptic_gregorian_to_julian_day(y: i16, m: u8, d: f64) -> f64 {
     let (y, m) = if m > 2 { (y, m) } else { (y - 1, m + 12) };
     let a = y.div_euclid(100);
     let b = 2 - a + a.div_euclid(4);
@@ -18,7 +18,7 @@ pub fn proleptic_gregorian_to_julian_day(y: i32, m: u8, d: f64) -> f64 {
 }
 
 /// Converts a Julian day to a proleptic Gregorian date.
-pub fn julian_day_to_proleptic_gregorian(jd: f64) -> (i32, u8, f64) {
+pub fn julian_day_to_proleptic_gregorian(jd: f64) -> (i16, u8, f64) {
     let jd = jd + 0.5;
     let z = jd.trunc();
     let f = jd.fract();
@@ -34,11 +34,11 @@ pub fn julian_day_to_proleptic_gregorian(jd: f64) -> (i32, u8, f64) {
     } else {
         (c - 4715.0, e - 13.0)
     };
-    (y as i32, m as u8, dom)
+    (y as i16, m as u8, dom)
 }
 
 #[cfg(test)]
-fn check_proleptic_gregorian_and_julian_day(y: i32, m: u8, d: f64, jd: f64) {
+fn check_proleptic_gregorian_and_julian_day(y: i16, m: u8, d: f64, jd: f64) {
     assert_eq!(proleptic_gregorian_to_julian_day(y, m, d), jd);
     assert_eq!(julian_day_to_proleptic_gregorian(jd), (y, m, d));
 }
@@ -61,21 +61,29 @@ fn test_proleptic_gregorian_and_julian_day() {
     check_proleptic_gregorian_and_julian_day(-4713, 11, 24.5, 0.0);
 }
 
+pub struct Calendar;
+
+impl calendar::Calendar for Calendar {
+    type Year = Year;
+    type Month = Month;
+    type Day = Day;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Year {
-    year: i32,
+    year: i16,
 }
 
 impl Year {
-    fn new(year: i32) -> Self {
+    fn new(year: i16) -> Self {
         Self { year }
     }
 
-    pub fn from_ord(ord: i32) -> Self {
+    pub fn from_ord(ord: i16) -> Self {
         Self::new(ord)
     }
 
-    pub fn from_y(y: i32) -> Self {
+    pub fn from_y(y: i16) -> Self {
         Self::from_ord(y)
     }
 
@@ -84,11 +92,8 @@ impl Year {
     }
 }
 
-impl calendar::Year for Year {
-    type Month = Month;
-    type Day = Day;
-
-    fn ord(&self) -> i32 {
+impl calendar::Year<Calendar> for Year {
+    fn ord(&self) -> i16 {
         self.year
     }
 
@@ -116,11 +121,8 @@ impl calendar::Year for Year {
         self.month_by_name(MonthName::last())
     }
 
-    fn months(&self) -> Vec<Month> {
-        MonthName::VARIANTS
-            .iter()
-            .map(|mn| self.month_by_name(*mn))
-            .collect()
+    fn months(&self) -> impl Iterator<Item = Month> {
+        MonthName::VARIANTS.iter().map(|mn| self.month_by_name(*mn))
     }
 
     fn num_days(&self) -> usize {
@@ -266,11 +268,11 @@ impl Month {
         Self { year, month }
     }
 
-    pub fn from_yn(year: i32, month_name: MonthName) -> Self {
+    pub fn from_yn(year: i16, month_name: MonthName) -> Self {
         Year::new(year).month_by_name(month_name)
     }
 
-    pub fn from_ym(year: i32, month: u8) -> Option<Self> {
+    pub fn from_ym(year: i16, month: u8) -> Option<Self> {
         MonthName::from_ord(month).map(|mn| Self::from_yn(year, mn))
     }
 
@@ -279,10 +281,7 @@ impl Month {
     }
 }
 
-impl calendar::Month for Month {
-    type Year = Year;
-    type Day = Day;
-
+impl calendar::Month<Calendar> for Month {
     fn ord(&self) -> u8 {
         self.month.ord()
     }
@@ -381,24 +380,21 @@ impl Day {
         Self { month, day }
     }
 
-    pub fn from_ynd(year: i32, month_name: MonthName, day: u8) -> Option<Self> {
+    pub fn from_ynd(year: i16, month_name: MonthName, day: u8) -> Option<Self> {
         Month::from_yn(year, month_name).day(day)
     }
 
-    pub fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
+    pub fn from_ymd(year: i16, month: u8, day: u8) -> Option<Self> {
         Month::from_ym(year, month).and_then(|m| m.day(day))
     }
 
     pub fn from_date_with_tz(date: Date, tz: f64) -> Self {
         let (y, m, d) = julian_day_to_proleptic_gregorian(date.midnight_jd(tz));
-        Self::from_ymd(y as i32, m, d as u8).unwrap()
+        Self::from_ymd(y, m, d as u8).unwrap()
     }
 }
 
-impl calendar::Day for Day {
-    type Year = Year;
-    type Month = Month;
-
+impl calendar::Day<Calendar> for Day {
     fn ord(&self) -> u8 {
         self.day + 1
     }

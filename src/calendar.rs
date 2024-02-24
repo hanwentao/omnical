@@ -1,41 +1,50 @@
 use crate::date::{Date, Weekday};
 
-pub trait Year: std::fmt::Display {
-    type Month: Month;
-    type Day: Day;
+pub trait Calendar: Sized {
+    type Year: Year<Self>;
+    type Month: Month<Self>;
+    type Day: Day<Self>;
+}
 
-    fn ord(&self) -> i32;
+pub trait Year<C: Calendar>: Sized + std::fmt::Display {
+    fn ord(&self) -> i16;
     fn succ(&self) -> Self;
     fn pred(&self) -> Self;
 
     fn num_months(&self) -> usize;
-    fn month(&self, ord: u8) -> Option<Self::Month>;
-    fn first_month(&self) -> Self::Month {
+    fn month(&self, ord: u8) -> Option<C::Month>;
+    fn first_month(&self) -> C::Month {
         self.month(1).unwrap()
     }
-    fn last_month(&self) -> Self::Month {
+    fn last_month(&self) -> C::Month {
         self.month(self.num_months() as u8).unwrap()
     }
-    fn months(&self) -> Vec<Self::Month> {
-        (1..=self.num_months() as u8)
-            .filter_map(|i| self.month(i))
-            .collect()
+    fn months(&self) -> impl Iterator<Item = C::Month> {
+        (1..=self.num_months() as u8).filter_map(|i| self.month(i))
     }
 
     fn num_days(&self) -> usize {
-        self.months().iter().map(|m| m.num_days()).sum()
+        self.months().map(|m| m.num_days()).sum()
     }
-    fn day(&self, ord: u16) -> Option<Self::Day>;
-    fn first_day(&self) -> Self::Day {
+    fn day(&self, ord: u16) -> Option<C::Day> {
+        let mut ord = ord;
+        for month in self.months() {
+            let num_days = month.num_days() as u16;
+            if ord <= num_days {
+                return month.day(ord as u8);
+            }
+            ord -= num_days;
+        }
+        None
+    }
+    fn first_day(&self) -> C::Day {
         self.day(1).unwrap()
     }
-    fn last_day(&self) -> Self::Day {
+    fn last_day(&self) -> C::Day {
         self.day(self.num_days() as u16).unwrap()
     }
-    fn days(&self) -> Vec<Self::Day> {
-        (1..=self.num_days() as u16)
-            .filter_map(|i| self.day(i))
-            .collect()
+    fn days(&self) -> impl Iterator<Item = C::Day> {
+        (1..=self.num_days() as u16).filter_map(|i| self.day(i))
     }
 
     fn is_leap(&self) -> bool {
@@ -43,28 +52,23 @@ pub trait Year: std::fmt::Display {
     }
 }
 
-pub trait Month: std::fmt::Display {
-    type Year: Year;
-    type Day: Day;
-
+pub trait Month<C: Calendar>: Sized + std::fmt::Display {
     fn ord(&self) -> u8;
     fn succ(&self) -> Self;
     fn pred(&self) -> Self;
 
-    fn year(&self) -> Self::Year;
+    fn year(&self) -> C::Year;
 
     fn num_days(&self) -> usize;
-    fn day(&self, ord: u8) -> Option<Self::Day>;
-    fn first_day(&self) -> Self::Day {
+    fn day(&self, ord: u8) -> Option<C::Day>;
+    fn first_day(&self) -> C::Day {
         self.day(1).unwrap()
     }
-    fn last_day(&self) -> Self::Day {
+    fn last_day(&self) -> C::Day {
         self.day(self.num_days() as u8).unwrap()
     }
-    fn days(&self) -> Vec<Self::Day> {
-        (1..=self.num_days() as u8)
-            .filter_map(|i| self.day(i))
-            .collect()
+    fn days(&self) -> impl Iterator<Item = C::Day> {
+        (1..=self.num_days() as u8).filter_map(|i| self.day(i))
     }
 
     fn is_leap(&self) -> bool {
@@ -72,10 +76,7 @@ pub trait Month: std::fmt::Display {
     }
 }
 
-pub trait Day: Clone + Copy + std::fmt::Display + Into<Date> {
-    type Year: Year;
-    type Month: Month;
-
+pub trait Day<C: Calendar>: Sized + Clone + Copy + std::fmt::Display + Into<Date> {
     fn ord(&self) -> u8;
     fn ord_in_year(&self) -> u16 {
         (1..self.month().ord())
@@ -87,8 +88,8 @@ pub trait Day: Clone + Copy + std::fmt::Display + Into<Date> {
     fn succ(&self) -> Self;
     fn pred(&self) -> Self;
 
-    fn year(&self) -> Self::Year;
-    fn month(&self) -> Self::Month;
+    fn year(&self) -> C::Year;
+    fn month(&self) -> C::Month;
 
     fn is_leap(&self) -> bool {
         false
