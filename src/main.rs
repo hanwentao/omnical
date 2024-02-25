@@ -25,7 +25,7 @@ enum Commands {
 #[derive(Args, Debug)]
 struct RangeArgs {
     /// The year.
-    year: Option<i16>,
+    year: Option<i32>,
     /// The month.
     month: Option<u8>,
 }
@@ -66,7 +66,7 @@ struct ListArgs {
     option: ListOptionArgs,
 }
 
-fn parse_range(args: &RangeArgs) -> (i16, Option<u8>) {
+fn parse_range(args: &RangeArgs) -> (i32, Option<u8>) {
     match args {
         RangeArgs {
             year: Some(y),
@@ -91,11 +91,11 @@ fn parse_range(args: &RangeArgs) -> (i16, Option<u8>) {
 fn print_calendar(args: &PrintArgs) {
     let (y, m) = parse_range(&args.range);
     if let Some(m) = m {
-        let month = GregorianMonth::from_ym(y, m).unwrap();
+        let month = GregorianCalendar::from_ym(y, m).unwrap();
         println!("{:^28}", format!("{:-}", month));
         print_month(month);
     } else {
-        let year = GregorianYear::from_y(y);
+        let year = GregorianCalendar::from_y(y).unwrap();
         println!("{:^28}", format!("Year {}", year));
         print_year(year);
     }
@@ -171,10 +171,10 @@ fn list_year(year: GregorianYear, options: &ListOptionArgs, chinese_day: &mut Op
 fn list_dates(args: &ListArgs) {
     let (y, m) = parse_range(&args.range);
     if let Some(m) = m {
-        let month = GregorianMonth::from_ym(y, m).unwrap();
+        let month = GregorianCalendar::from_ym(y, m).unwrap();
         list_month(month, &args.option, &mut None);
     } else {
-        let year = GregorianYear::from_y(y);
+        let year = GregorianCalendar::from_y(y).unwrap();
         list_year(year, &args.option, &mut None);
     }
 }

@@ -157,31 +157,31 @@ fn test_weekday() {
 /// A generic date type using Julian day number (JDN) as its internal representation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Date {
-    jdn: u32,
+    jdn: i32,
 }
 
 impl Date {
-    fn new(jdn: u32) -> Self {
+    const fn new(jdn: i32) -> Self {
         Self { jdn }
     }
 
-    pub fn from_jdn(jdn: u32) -> Self {
+    pub const fn from_jdn(jdn: i32) -> Self {
         Self::new(jdn)
     }
 
-    pub fn jdn(&self) -> u32 {
+    pub const fn jdn(&self) -> i32 {
         self.jdn
     }
 
     pub fn from_jd(jd: f64) -> Self {
         Self {
-            jdn: (jd + 0.5).floor() as u32,
+            jdn: (jd + 0.5).floor() as i32,
         }
     }
 
     pub fn from_jd_with_tz(jd: f64, tz: f64) -> Self {
         Self {
-            jdn: (jd + 0.5 - tz / 24.0).floor() as u32,
+            jdn: (jd + 0.5 - tz / 24.0).floor() as i32,
         }
     }
 
@@ -205,16 +205,16 @@ impl Date {
         Self::from_unix_time_with_tz(unix_time, 0.0)
     }
 
-    pub fn succ(&self) -> Self {
+    pub const fn succ(&self) -> Self {
         Self::new(self.jdn + 1)
     }
 
-    pub fn pred(&self) -> Self {
+    pub const fn pred(&self) -> Self {
         Self::new(self.jdn - 1)
     }
 
-    pub fn weekday(&self) -> Weekday {
-        Weekday::from_repr(self.jdn.rem_euclid(7) as usize).unwrap()
+    pub const fn weekday(&self) -> Weekday {
+        *ignore_none(&Weekday::from_repr(self.jdn.rem_euclid(7) as usize))
     }
 
     pub fn solar_term(&self, tz: f64) -> Option<SolarTerm> {
@@ -242,7 +242,7 @@ impl Date {
 
 impl std::ops::AddAssign<i32> for Date {
     fn add_assign(&mut self, rhs: i32) {
-        self.jdn = self.jdn.saturating_add_signed(rhs);
+        self.jdn += rhs;
     }
 }
 
@@ -270,7 +270,7 @@ impl std::ops::Sub for Date {
     type Output = i32;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        self.jdn as i32 - rhs.jdn as i32
+        self.jdn - rhs.jdn
     }
 }
 

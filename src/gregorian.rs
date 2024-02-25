@@ -2,23 +2,23 @@
 use strum::{AsRefStr, Display, EnumCount, EnumString, FromRepr, VariantArray};
 
 use crate::calendar;
-use crate::calendar::{Day as _, Month as _, Year as _};
+use crate::calendar::{Calendar as _, Day as _, Month as _, Year as _};
 use crate::date::*;
 
 #[cfg(test)]
 use std::str::FromStr;
 
 /// Converts a proleptic Gregorian date to a Julian day.
-pub fn proleptic_gregorian_to_julian_day(y: i16, m: u8, d: f64) -> f64 {
+pub fn proleptic_gregorian_to_julian_day(y: i32, m: u8, d: f64) -> f64 {
     let (y, m) = if m > 2 { (y, m) } else { (y - 1, m + 12) };
     let a = y.div_euclid(100);
     let b = 2 - a + a.div_euclid(4);
-    (365.25 * (y as i32 + 4716) as f64).floor() + (30.6001 * (m + 1) as f64).floor() + d + b as f64
+    (365.25 * (y + 4716) as f64).floor() + (30.6001 * (m + 1) as f64).floor() + d + b as f64
         - 1524.5
 }
 
 /// Converts a Julian day to a proleptic Gregorian date.
-pub fn julian_day_to_proleptic_gregorian(jd: f64) -> (i16, u8, f64) {
+pub fn julian_day_to_proleptic_gregorian(jd: f64) -> (i32, u8, f64) {
     let jd = jd + 0.5;
     let z = jd.trunc();
     let f = jd.fract();
@@ -34,11 +34,11 @@ pub fn julian_day_to_proleptic_gregorian(jd: f64) -> (i16, u8, f64) {
     } else {
         (c - 4715.0, e - 13.0)
     };
-    (y as i16, m as u8, dom)
+    (y as i32, m as u8, dom)
 }
 
 #[cfg(test)]
-fn check_proleptic_gregorian_and_julian_day(y: i16, m: u8, d: f64, jd: f64) {
+fn check_proleptic_gregorian_and_julian_day(y: i32, m: u8, d: f64, jd: f64) {
     assert_eq!(proleptic_gregorian_to_julian_day(y, m, d), jd);
     assert_eq!(julian_day_to_proleptic_gregorian(jd), (y, m, d));
 }
@@ -68,41 +68,34 @@ impl calendar::Calendar for Calendar {
     type Month = Month;
     type Day = Day;
 
-    fn from_y(year: i16) -> Year {
-        Year::from_y(year)
-    }
-
-    fn from_ymo(year: i16, month: u8) -> Option<Month> {
-        Month::from_ym(year, month)
-    }
-
-    fn from_ymdo(year: i16, month: u8, day: u8) -> Option<Day> {
-        Day::from_ymd(year, month, day)
+    fn from_y(year: i32) -> Option<Year> {
+        // TODO: More precise validation
+        if (-5_000_000..=5_000_000).contains(&year) {
+            Some(Year::new(year))
+        } else {
+            None
+        }
     }
 }
 
 impl Calendar {
-    pub fn from_yn(year: i16, month: MonthName) -> Month {
-        Month::from_yn(year, month)
+    pub fn from_yn(year: i32, month: MonthName) -> Option<Month> {
+        Some(Self::from_y(year)?.month_by_name(month))
     }
 
-    pub fn from_yndo(year: i16, month: MonthName, day: u8) -> Option<Day> {
-        Day::from_ynd(year, month, day)
+    pub fn from_yndo(year: i32, month: MonthName, day: u8) -> Option<Day> {
+        Self::from_yn(year, month)?.day(day)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Year {
-    year: i16,
+    year: i32,
 }
 
 impl Year {
-    fn new(year: i16) -> Self {
+    fn new(year: i32) -> Self {
         Self { year }
-    }
-
-    pub fn from_y(y: i16) -> Self {
-        Self::new(y)
     }
 
     pub fn month_by_name(&self, month_name: MonthName) -> Month {
@@ -111,7 +104,7 @@ impl Year {
 }
 
 impl calendar::Year<Calendar> for Year {
-    fn ord(&self) -> i16 {
+    fn ord(&self) -> i32 {
         self.year
     }
 
@@ -170,22 +163,28 @@ impl calendar::Year<Calendar> for Year {
 
 #[test]
 fn test_year() {
-    let year = Year::from_y(1985);
+    let year = Calendar::from_y(1985).unwrap();
     assert_eq!(year.ord(), 1985);
     assert!(!year.is_leap());
     assert_eq!(year.num_months(), 12);
     assert_eq!(year.num_days(), 365);
 
-    assert!(Year::from_y(2024).is_leap());
-    assert!(Year::from_y(2000).is_leap());
-    assert!(!Year::from_y(1900).is_leap());
+    assert!(Calendar::from_y(2024).unwrap().is_leap());
+    assert!(Calendar::from_y(2000).unwrap().is_leap());
+    assert!(!Calendar::from_y(1900).unwrap().is_leap());
 
-    assert_eq!(year.succ(), Year::from_y(1986));
-    assert_eq!(year.pred(), Year::from_y(1984));
+    assert_eq!(year.succ(), Calendar::from_y(1986).unwrap());
+    assert_eq!(year.pred(), Calendar::from_y(1984).unwrap());
 
     assert_eq!(year.month(1).unwrap(), year.month_by_name(January));
-    assert_eq!(year.day(1).unwrap(), Day::from_ymd(1985, 1, 1).unwrap());
-    assert_eq!(year.day(365).unwrap(), Day::from_ymd(1985, 12, 31).unwrap());
+    assert_eq!(
+        year.day(1).unwrap(),
+        Calendar::from_ymd(1985, 1, 1).unwrap()
+    );
+    assert_eq!(
+        year.day(365).unwrap(),
+        Calendar::from_ymd(1985, 12, 31).unwrap()
+    );
 }
 
 #[derive(
@@ -286,14 +285,6 @@ impl Month {
         Self { year, month }
     }
 
-    pub fn from_yn(year: i16, month_name: MonthName) -> Self {
-        Year::new(year).month_by_name(month_name)
-    }
-
-    pub fn from_ym(year: i16, month: u8) -> Option<Self> {
-        MonthName::from_ord(month).map(|mn| Self::from_yn(year, mn))
-    }
-
     pub fn name(&self) -> MonthName {
         self.month
     }
@@ -355,35 +346,35 @@ impl calendar::Month<Calendar> for Month {
 
 #[test]
 fn test_month() {
-    let month = Month::from_yn(1985, September);
+    let month = Calendar::from_yn(1985, September).unwrap();
     assert_eq!(month.the_year().ord(), 1985);
     assert_eq!(month.ord(), 9);
     assert!(!month.is_leap());
     assert_eq!(month.num_days(), 30);
 
-    assert!(!Month::from_yn(1985, February).is_leap());
-    assert!(Month::from_yn(2024, February).is_leap());
-    assert!(Month::from_yn(2000, February).is_leap());
-    assert!(!Month::from_yn(1900, February).is_leap());
+    assert!(!Calendar::from_yn(1985, February).unwrap().is_leap());
+    assert!(Calendar::from_yn(2024, February).unwrap().is_leap());
+    assert!(Calendar::from_yn(2000, February).unwrap().is_leap());
+    assert!(!Calendar::from_yn(1900, February).unwrap().is_leap());
 
-    assert_eq!(Month::from_yn(1986, January).num_days(), 31);
+    assert_eq!(Calendar::from_yn(1986, January).unwrap().num_days(), 31);
 
-    assert_eq!(Month::from_ym(2024, 0), None);
-    assert_eq!(Month::from_ym(2024, 13), None);
+    assert_eq!(Calendar::from_ym(2024, 0), None);
+    assert_eq!(Calendar::from_ym(2024, 13), None);
     assert_eq!(
-        Month::from_ym(2024, 2),
-        Some(Month::from_yn(2024, February))
+        Calendar::from_ym(2024, 2),
+        Calendar::from_yn(2024, February)
     );
 
-    assert_eq!(month.succ(), Month::from_yn(1985, October));
-    assert_eq!(month.pred(), Month::from_yn(1985, August));
+    assert_eq!(month.succ(), Calendar::from_yn(1985, October).unwrap());
+    assert_eq!(month.pred(), Calendar::from_yn(1985, August).unwrap());
     assert_eq!(
-        Month::from_yn(2024, January).pred(),
-        Month::from_yn(2023, December)
+        Calendar::from_yn(2024, January).unwrap().pred(),
+        Calendar::from_yn(2023, December).unwrap()
     );
     assert_eq!(
-        Month::from_yn(2023, December).succ(),
-        Month::from_yn(2024, January)
+        Calendar::from_yn(2023, December).unwrap().succ(),
+        Calendar::from_yn(2024, January).unwrap()
     );
 }
 
@@ -398,17 +389,9 @@ impl Day {
         Self { month, day }
     }
 
-    pub fn from_ynd(year: i16, month_name: MonthName, day: u8) -> Option<Self> {
-        Month::from_yn(year, month_name).day(day)
-    }
-
-    pub fn from_ymd(year: i16, month: u8, day: u8) -> Option<Self> {
-        Month::from_ym(year, month).and_then(|m| m.day(day))
-    }
-
     pub fn from_date_with_tz(date: Date, tz: f64) -> Self {
         let (y, m, d) = julian_day_to_proleptic_gregorian(date.midnight_jd(tz));
-        Self::from_ymd(y, m, d as u8).unwrap()
+        Calendar::from_ymd(y, m, d as u8).unwrap()
     }
 }
 
@@ -460,21 +443,18 @@ impl From<Date> for Day {
 
 #[test]
 fn test_day() {
-    assert_eq!(Date::from(Day::from_ymd(-4713, 11, 24).unwrap()).jdn(), 0);
-    assert_eq!(
-        Date::from(Day::from_ymd(2000, 1, 1).unwrap()).jdn(),
-        2451545
-    );
+    assert_eq!(Calendar::from_ymd(-4713, 11, 24).unwrap().jdn(), 0);
+    assert_eq!(Calendar::from_ymd(2000, 1, 1).unwrap().jdn(), 2451545);
 
-    assert_eq!(Day::from_ymd(1582, 10, 15).unwrap().weekday(), Friday);
-    assert_eq!(Day::from_ymd(1985, 9, 15).unwrap().weekday(), Sunday);
-    assert_eq!(Day::from_ymd(2024, 2, 11).unwrap().weekday(), Sunday);
+    assert_eq!(Calendar::from_ymd(1582, 10, 15).unwrap().weekday(), Friday);
+    assert_eq!(Calendar::from_ymd(1985, 9, 15).unwrap().weekday(), Sunday);
+    assert_eq!(Calendar::from_ymd(2024, 2, 11).unwrap().weekday(), Sunday);
 
-    assert_ne!(Day::from_ymd(2024, 2, 29), None);
-    assert_eq!(Day::from_ymd(2022, 2, 29), None);
+    assert_ne!(Calendar::from_ymd(2024, 2, 29), None);
+    assert_eq!(Calendar::from_ymd(2022, 2, 29), None);
 
-    let last_day_of_2023 = Day::from_ymd(2023, 12, 31).unwrap();
-    let first_day_of_2024 = Day::from_ymd(2024, 1, 1).unwrap();
+    let last_day_of_2023 = Calendar::from_ymd(2023, 12, 31).unwrap();
+    let first_day_of_2024 = Calendar::from_ymd(2024, 1, 1).unwrap();
     assert_eq!(last_day_of_2023.succ(), first_day_of_2024);
     assert_eq!(first_day_of_2024.pred(), last_day_of_2023);
 }

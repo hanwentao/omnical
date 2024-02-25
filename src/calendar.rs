@@ -5,13 +5,20 @@ pub trait Calendar: Sized {
     type Month: Month<Self>;
     type Day: Day<Self>;
 
-    fn from_y(year: i16) -> Self::Year;
-    fn from_ymo(year: i16, month: u8) -> Option<Self::Month>;
-    fn from_ymdo(year: i16, month: u8, day: u8) -> Option<Self::Day>;
+    fn from_y(year: i32) -> Option<Self::Year>;
+    fn from_ym(year: i32, month: u8) -> Option<Self::Month> {
+        Self::from_y(year)?.month(month)
+    }
+    fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self::Day> {
+        Self::from_ym(year, month)?.day(day)
+    }
+    fn from_yo(year: i32, day_ord: u16) -> Option<Self::Day> {
+        Self::from_y(year)?.day(day_ord)
+    }
 }
 
 pub trait Year<C: Calendar>: Sized + std::fmt::Display {
-    fn ord(&self) -> i16;
+    fn ord(&self) -> i32;
     fn succ(&self) -> Self;
     fn pred(&self) -> Self;
 
@@ -97,6 +104,10 @@ pub trait Day<C: Calendar>: Sized + Clone + Copy + std::fmt::Display + Into<Date
 
     fn is_leap(&self) -> bool {
         false
+    }
+    fn jdn(&self) -> i32 {
+        let date: Date = (*self).into();
+        date.jdn()
     }
     fn weekday(&self) -> Weekday {
         let date: Date = (*self).into();
