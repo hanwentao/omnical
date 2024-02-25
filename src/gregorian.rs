@@ -83,7 +83,7 @@ impl Calendar {
         Some(Self::from_y(year)?.month_by_name(month))
     }
 
-    pub fn from_yndo(year: i32, month: MonthName, day: u8) -> Option<Day> {
+    pub fn from_ynd(year: i32, month: MonthName, day: u8) -> Option<Day> {
         Self::from_yn(year, month)?.day(day)
     }
 }
