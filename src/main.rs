@@ -39,7 +39,7 @@ struct PrintArgs {
 }
 
 #[derive(Args, Debug)]
-struct ListOptionArgs {
+struct OptionArgs {
     /// Display the date in Chinese calendar.
     #[arg(short, long)]
     chinese: bool,
@@ -64,13 +64,16 @@ struct ListArgs {
     range: RangeArgs,
     /// List options.
     #[command(flatten)]
-    option: ListOptionArgs,
+    option: OptionArgs,
 }
 
 #[derive(Args, Debug)]
 struct QueryArgs {
     /// The date to query.
     date: Option<String>,
+    /// Query options.
+    #[command(flatten)]
+    option: OptionArgs,
 }
 
 fn parse_range(args: &RangeArgs) -> (i32, Option<u8>) {
@@ -135,11 +138,7 @@ fn print_month(month: GregorianMonth) {
     }
 }
 
-fn list_month(
-    month: GregorianMonth,
-    options: &ListOptionArgs,
-    chinese_day: &mut Option<ChineseDay>,
-) {
+fn list_month(month: GregorianMonth, options: &OptionArgs, chinese_day: &mut Option<ChineseDay>) {
     for day in month.days() {
         let date: Date = day.into();
         print!("{:#}", day);
@@ -169,7 +168,7 @@ fn list_month(
     }
 }
 
-fn list_year(year: GregorianYear, options: &ListOptionArgs, chinese_day: &mut Option<ChineseDay>) {
+fn list_year(year: GregorianYear, options: &OptionArgs, chinese_day: &mut Option<ChineseDay>) {
     for month in year.months() {
         list_month(month, options, chinese_day);
     }
@@ -187,6 +186,7 @@ fn list_dates(args: &ListArgs) {
 }
 
 fn query_date(args: &QueryArgs) {
+    // TODO: Use parse function when it's available.
     let date = if let Some(date) = &args.date {
         let y: i32 = date[0..4].parse().unwrap();
         let m: u8 = date[4..6].parse().unwrap();
@@ -195,7 +195,31 @@ fn query_date(args: &QueryArgs) {
     } else {
         Date::from_unix_time(unix_time_now())
     };
-    println!("{}", date.lunar_phase(8.0).emoji());
+    if args.option.chinese {
+        println!("{}", ChineseDay::from(date));
+    }
+    if args.option.weekday {
+        println!("{}", date.weekday());
+    }
+    if args.option.lunar_phase {
+        println!("{}", date.lunar_phase(8.0).chinese());
+    }
+    if args.option.lunar_phase_emoji {
+        println!("{}", date.lunar_phase(8.0).emoji());
+    }
+    if args.option.solar_term {
+        if let Some(st) = date.solar_term(8.0) {
+            println!("{}", st.chinese());
+        }
+    }
+    if !args.option.chinese
+        && !args.option.weekday
+        && !args.option.lunar_phase
+        && !args.option.lunar_phase_emoji
+        && !args.option.solar_term
+    {
+        println!("{}", ChineseDay::from(date));
+    }
 }
 
 fn main() {
