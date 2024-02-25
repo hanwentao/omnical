@@ -19,7 +19,8 @@ enum Commands {
     /// List the days of a calendar in details.
     List(ListArgs),
     // TODO: Convert a date from one calendar to another.
-    // TODO: Query the information of a date.
+    /// Query the information of a date.
+    Query(QueryArgs),
 }
 
 #[derive(Args, Debug)]
@@ -64,6 +65,12 @@ struct ListArgs {
     /// List options.
     #[command(flatten)]
     option: ListOptionArgs,
+}
+
+#[derive(Args, Debug)]
+struct QueryArgs {
+    /// The date to query.
+    date: Option<String>,
 }
 
 fn parse_range(args: &RangeArgs) -> (i32, Option<u8>) {
@@ -179,12 +186,25 @@ fn list_dates(args: &ListArgs) {
     }
 }
 
+fn query_date(args: &QueryArgs) {
+    let date = if let Some(date) = &args.date {
+        let y: i32 = date[0..4].parse().unwrap();
+        let m: u8 = date[4..6].parse().unwrap();
+        let d: u8 = date[6..8].parse().unwrap();
+        GregorianCalendar::from_ymd(y, m, d).unwrap().into()
+    } else {
+        Date::from_unix_time(unix_time_now())
+    };
+    println!("{}", date.lunar_phase(8.0).emoji());
+}
+
 fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
         Some(Commands::Print(args)) => print_calendar(args),
         Some(Commands::List(args)) => list_dates(args),
+        Some(Commands::Query(args)) => query_date(args),
         None => print_calendar(&cli.args),
     }
 }
