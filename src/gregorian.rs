@@ -1,12 +1,8 @@
 /// Proleptic Gregorian calendar
 use strum::{AsRefStr, Display, EnumCount, EnumString, FromRepr, VariantArray};
 
-use crate::calendar;
 use crate::calendar::{Calendar as _, Day as _, Month as _, Year as _};
-use crate::date::*;
-
-#[cfg(test)]
-use std::str::FromStr;
+use crate::*;
 
 /// Converts a proleptic Gregorian date to a Julian day.
 pub fn proleptic_gregorian_to_julian_day(y: i32, m: u8, d: f64) -> f64 {
@@ -254,7 +250,7 @@ fn test_month_name() {
         ]
     );
 
-    let jan = MonthName::from_str("January").unwrap();
+    let jan: MonthName = "January".parse().unwrap();
     assert_eq!(jan as u8, 0);
     assert_eq!(jan.ord(), 1);
     assert_eq!(jan.to_string(), "January");
@@ -264,7 +260,7 @@ fn test_month_name() {
     assert_eq!(dec.ord(), 12);
     assert_eq!(dec.to_string(), "December");
 
-    assert!(MonthName::from_str("Invalid").is_err());
+    assert!("Invalid".parse::<MonthName>().is_err());
     assert!(MonthName::from_repr(12).is_none());
     assert_eq!(MonthName::from_ord(9), Some(September));
 

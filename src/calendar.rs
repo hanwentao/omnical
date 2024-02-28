@@ -1,4 +1,4 @@
-use crate::date::{Date, Weekday};
+use crate::*;
 
 pub trait Calendar: Sized {
     type Year: Year<Self>;

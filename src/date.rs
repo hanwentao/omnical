@@ -1,10 +1,6 @@
 use strum::{AsRefStr, EnumCount, EnumProperty, EnumString, FromRepr, VariantArray};
 
-use crate::astronomy::*;
 use crate::*;
-
-#[cfg(test)]
-use std::str::FromStr;
 
 /// The 7 days of the week.
 #[derive(
@@ -129,7 +125,7 @@ fn test_weekday() {
         &[Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday]
     );
 
-    let mon = Weekday::from_str("Monday").unwrap();
+    let mon: Weekday = "Monday".parse().unwrap();
     assert_eq!(mon as i8, 0);
     assert_eq!(mon.to_string(), "Monday");
 
@@ -137,7 +133,7 @@ fn test_weekday() {
     assert_eq!(sun as i8, 6);
     assert_eq!(sun.to_string(), "Sunday");
 
-    assert!(Weekday::from_str("Badday").is_err());
+    assert!("Badday".parse::<Weekday>().is_err());
     assert!(Weekday::from_repr(7).is_none());
 
     assert!(Weekday::from_ord(0).is_none());
@@ -218,8 +214,8 @@ impl Date {
     }
 
     pub fn solar_term(&self, tz: f64) -> Option<SolarTerm> {
-        let curr_sun_ecl_long = get_sun_ecl_long(self.midnight_jd(tz));
-        let next_sun_ecl_long = get_sun_ecl_long(self.succ().midnight_jd(tz));
+        let curr_sun_ecl_long = astronomy::get_sun_ecl_long(self.midnight_jd(tz));
+        let next_sun_ecl_long = astronomy::get_sun_ecl_long(self.succ().midnight_jd(tz));
         let curr_sun_ecl_long = if next_sun_ecl_long < curr_sun_ecl_long {
             curr_sun_ecl_long - 360.0
         } else {
@@ -229,8 +225,9 @@ impl Date {
     }
 
     pub fn lunar_phase(&self, tz: f64) -> LunarPhase {
-        let curr_moon_ecl_long_to_sun = get_moon_ecl_long_to_sun(self.midnight_jd(tz));
-        let next_moon_ecl_long_to_sun = get_moon_ecl_long_to_sun(self.succ().midnight_jd(tz));
+        let curr_moon_ecl_long_to_sun = astronomy::get_moon_ecl_long_to_sun(self.midnight_jd(tz));
+        let next_moon_ecl_long_to_sun =
+            astronomy::get_moon_ecl_long_to_sun(self.succ().midnight_jd(tz));
         let curr_moon_ecl_long_to_sun = if next_moon_ecl_long_to_sun < curr_moon_ecl_long_to_sun {
             curr_moon_ecl_long_to_sun - 360.0
         } else {
