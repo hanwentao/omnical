@@ -480,6 +480,14 @@ impl Month {
     fn new(year: Year, month: u8) -> Self {
         Self { year, month }
     }
+
+    pub fn ord_no_leap(&self) -> u8 {
+        if self.month < self.year.leap_month {
+            self.month + 1
+        } else {
+            self.month
+        }
+    }
 }
 
 impl calendar::Month<Calendar> for Month {
@@ -530,6 +538,10 @@ fn test_month() {
     assert_eq!(Calendar::from_ym(2023, 1).unwrap(), Month::new(year, 0));
     assert_eq!(Calendar::from_ym(2023, 2).unwrap(), Month::new(year, 1));
     assert_eq!(Calendar::from_ym(2023, 3).unwrap(), Month::new(year, 2));
+    assert_eq!(Calendar::from_ym(2023, 1).unwrap().ord_no_leap(), 1);
+    assert_eq!(Calendar::from_ym(2023, 2).unwrap().ord_no_leap(), 2);
+    assert_eq!(Calendar::from_ym(2023, 3).unwrap().ord_no_leap(), 2);
+    assert_eq!(Calendar::from_ym(2023, 4).unwrap().ord_no_leap(), 3);
     assert_eq!(
         Calendar::from_ylm(2023, false, 1).unwrap(),
         Month::new(year, 0)
