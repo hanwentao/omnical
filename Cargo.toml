@@ -14,3 +14,8 @@ clap = { version = "4.5.1", features = ["derive"] }
 derivative = "2.2.0"
 strum = { version = "0.26.1", features = ["derive"] }
 strum_macros = "0.26.1"
+
+[dev-dependencies]
+chinese-lunisolar-calendar = "0.2.0"
+chrono = "0.4.34"
+nongli = "0.1.1"
