@@ -193,7 +193,7 @@ fn query_date(args: &QueryArgs) {
         let d: u8 = date[6..8].parse().unwrap();
         GregorianCalendar::from_ymd(y, m, d).unwrap().into()
     } else {
-        Date::from_unix_time(unix_time_now())
+        Date::from_unix_time_with_tz(unix_time_now(), 8.0)
     };
     if args.option.chinese {
         println!("{}", ChineseDay::from(date));

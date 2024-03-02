@@ -177,7 +177,7 @@ impl Date {
 
     pub fn from_jd_with_tz(jd: f64, tz: f64) -> Self {
         Self {
-            jdn: (jd + 0.5 - tz / 24.0).floor() as i32,
+            jdn: (jd + 0.5 + tz / 24.0).floor() as i32,
         }
     }
 
@@ -194,7 +194,7 @@ impl Date {
     }
 
     pub fn from_unix_time_with_tz(unix_time: u64, tz: f64) -> Self {
-        Self::from_jd(unix_time as f64 / 86400.0 + 2440587.5 - tz / 24.0)
+        Self::from_jd_with_tz(unix_time as f64 / 86400.0 + 2440587.5, tz)
     }
 
     pub fn from_unix_time(unix_time: u64) -> Self {
@@ -292,4 +292,7 @@ fn test_date() {
     assert_eq!(Date::from_jdn(2460292).lunar_phase(8.0), NewMoon);
 
     assert_eq!(d2 - d1, 1);
+
+    let j2000: Date = GregorianCalendar::from_ymd(2000, 1, 1).unwrap().into();
+    assert_eq!(j2000.jdn(), 2451545);
 }
