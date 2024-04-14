@@ -119,6 +119,7 @@ fn print_year(year: GregorianYear) {
 }
 
 fn print_month(month: GregorianMonth) {
+    let today: GregorianDay = Date::from_unix_time_with_tz(unix_time_now(), 8.0).into();
     for weekday in Weekday::VARIANTS {
         print!(" {:3}", weekday);
     }
@@ -128,7 +129,11 @@ fn print_month(month: GregorianMonth) {
         print!("    ");
     }
     for day in days {
-        print!("{:>4}", day.ord());
+        if day == today {
+            print!("[{:>2}]", day.ord());
+        } else {
+            print!(" {:>2} ", day.ord());
+        }
         if day.weekday() == Weekday::last() {
             println!();
         }
