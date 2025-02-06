@@ -32,13 +32,3 @@ pub fn unix_time_now() -> u64 {
     let now = std::time::SystemTime::now();
     now.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
 }
-
-/// Ignores the `None` variant of an `Option` and returns the inner value.
-///
-/// It is a work-around for unstable feature of `Option::unwrap` in const fn.
-pub const fn ignore_none<T>(x: &Option<T>) -> &T {
-    match x {
-        Some(x) => x,
-        None => unreachable!(),
-    }
-}

@@ -65,16 +65,12 @@ impl Weekday {
 
     /// The next variant.
     pub const fn succ(&self) -> Self {
-        *ignore_none(&Self::from_repr(
-            (*self as isize + 1).rem_euclid(Self::COUNT as isize) as usize,
-        ))
+        Self::from_repr((*self as isize + 1).rem_euclid(Self::COUNT as isize) as usize).unwrap()
     }
 
     /// The previous variant.
     pub fn pred(&self) -> Self {
-        *ignore_none(&Self::from_repr(
-            (*self as isize - 1).rem_euclid(Self::COUNT as isize) as usize,
-        ))
+        Self::from_repr((*self as isize - 1).rem_euclid(Self::COUNT as isize) as usize).unwrap()
     }
 
     /// Chinese name of the variant.
@@ -210,7 +206,7 @@ impl Date {
     }
 
     pub const fn weekday(&self) -> Weekday {
-        *ignore_none(&Weekday::from_repr(self.jdn.rem_euclid(7) as usize))
+        Weekday::from_repr(self.jdn.rem_euclid(7) as usize).unwrap()
     }
 
     pub fn solar_term(&self, tz: f64) -> Option<SolarTerm> {
