@@ -118,7 +118,9 @@ fn test_weekday() {
     assert_eq!(Weekday::COUNT, 7);
     assert_eq!(
         Weekday::VARIANTS,
-        &[Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday]
+        &[
+            Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
+        ]
     );
 
     let mon: Weekday = "Monday".parse().unwrap();

@@ -133,11 +133,7 @@ impl calendar::Year<Calendar> for Year {
     }
 
     fn num_days(&self) -> usize {
-        if self.is_leap() {
-            366
-        } else {
-            365
-        }
+        if self.is_leap() { 366 } else { 365 }
     }
 
     fn day(&self, ord: u16) -> Option<Day> {

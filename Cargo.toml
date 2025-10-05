@@ -1,7 +1,7 @@
 [package]
 name = "omnical"
-version = "0.10.6"
-edition = "2021"
+version = "0.11.0"
+edition = "2024"
 description = "Print calendars, convert dates, and more."
 license = "MIT"
 repository = "https://github.com/hanwentao/omnical/"

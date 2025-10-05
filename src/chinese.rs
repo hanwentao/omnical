@@ -434,11 +434,7 @@ impl calendar::Year<Calendar> for Year {
     }
 
     fn num_months(&self) -> usize {
-        if self.leap_month < 13 {
-            13
-        } else {
-            12
-        }
+        if self.leap_month < 13 { 13 } else { 12 }
     }
 
     fn month(&self, ord: u8) -> Option<Month> {

@@ -322,7 +322,7 @@ dependencies = [
 
 [[package]]
 name = "omnical"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "astro",
  "chinese-lunisolar-calendar",
