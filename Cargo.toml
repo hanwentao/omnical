@@ -10,12 +10,12 @@ default-run = "omnical"
 
 [dependencies]
 astro = "2.0.0"
-clap = { version = "4.5.1", features = ["derive"] }
+clap = { version = "4.5.48", features = ["derive"] }
 derivative = "2.2.0"
-strum = { version = "0.26.1", features = ["derive"] }
-strum_macros = "0.26.1"
+strum = { version = "0.27.2", features = ["derive"] }
+strum_macros = "0.27.2"
 
 [dev-dependencies]
 chinese-lunisolar-calendar = "0.2.0"
-chrono = "0.4.34"
-nongli = "0.1.1"
+chrono = "0.4.42"
+nongli = "0.4.1"

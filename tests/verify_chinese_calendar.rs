@@ -14,7 +14,7 @@ fn verify_chinese_calendar() {
             let m = day.the_month().ord();
             let d = day.ord();
 
-            let y1 = chinese_day.the_year().ord() as u16;
+            let y1 = chinese_day.the_year().ord();
             let m1 = chinese_day.the_month().ord_no_leap();
             let l1 = chinese_day.the_month().is_leap();
             let d1 = chinese_day.ord();
@@ -22,7 +22,7 @@ fn verify_chinese_calendar() {
             let solar_date = SolarDate::from_ymd(y, m, d).unwrap();
             let lunisolar_date = LunisolarDate::from_solar_date(solar_date).unwrap();
 
-            let y2 = lunisolar_date.to_lunisolar_year().to_u16();
+            let y2 = lunisolar_date.to_lunisolar_year().to_u16() as i32;
             let m2 = lunisolar_date.to_lunar_month().to_u8();
             let l2 = lunisolar_date.to_lunar_month().is_leap_month();
             let d2 = lunisolar_date.to_lunar_day().to_u8();
